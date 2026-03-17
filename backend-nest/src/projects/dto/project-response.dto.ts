@@ -34,6 +34,13 @@ export class ProjectSummaryDto {
   logoUrl?: string | null;
 
   @ApiProperty({
+    description: '项目级默认代理地址，通常用于真实服务代理模式的上游服务 baseURL',
+    example: 'https://api.example.com',
+    required: false,
+  })
+  proxyUrl?: string | null;
+
+  @ApiProperty({
     description: '项目唯一 Mock 密钥，用于通过 Header x-mock-key 标识项目',
     example: 'mk_live_1a2b3c4d',
   })
@@ -72,5 +79,13 @@ export class ProjectDetailDto {
     example: 'mk_live_1a2b3c4d',
   })
   mockKey: string;
+
+  @ApiProperty({
+    description: '项目级默认代理策略：static（静态 Mock）、script（脚本 Mock）、proxy（真实服务代理）',
+    enum: ['static', 'script', 'proxy'],
+    example: 'static',
+    required: false,
+  })
+  defaultMockMode?: string;
 }
 

@@ -18,5 +18,18 @@ export class UpdateProjectDto {
     example: '/api/upload/logos/logo_1713778899_xxxxx.webp',
   })
   logoUrl?: string | null;
+
+  @ApiPropertyOptional({
+    description: '项目级默认代理地址，未传则保持原值；传空字符串可清空原有配置',
+    example: 'https://api.example.com',
+  })
+  proxyUrl?: string | null;
+
+  @ApiPropertyOptional({
+    description: '默认代理策略：static（静态 Mock）、script（脚本 Mock）、proxy（真实服务代理），未传则保持原值',
+    enum: ['static', 'script', 'proxy'],
+    example: 'static',
+  })
+  defaultMockMode?: string;
 }
 

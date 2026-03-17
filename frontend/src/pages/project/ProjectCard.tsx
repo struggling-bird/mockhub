@@ -102,6 +102,9 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 overflow-hidden">
             <Key size={10} className="text-slate-400 shrink-0" />
+            <span className="text-[8px] text-slate-400 uppercase tracking-widest">
+              {t('mockKey')}
+            </span>
             <code className="text-[8px] font-mono text-slate-500 truncate">
               {derivedMockKey}
             </code>

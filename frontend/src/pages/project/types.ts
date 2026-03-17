@@ -13,4 +13,5 @@ export interface ProjectFormData {
   proxyUrl: string;
   members: string;
   logo: string;
+   defaultMockMode: 'static' | 'script' | 'proxy';
 }

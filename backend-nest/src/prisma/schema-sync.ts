@@ -54,7 +54,9 @@ export async function ensureDatabaseSchema(config: DatabaseConfig) {
         description TEXT         NULL,
         owner_id    VARCHAR(50)  NOT NULL,
         logo_url    VARCHAR(512) NULL,
+        proxy_url   VARCHAR(512) NULL,
         mock_key    VARCHAR(64)  NULL UNIQUE,
+        default_mock_mode VARCHAR(50) NULL,
         created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT fk_projects_owner
@@ -69,11 +71,19 @@ export async function ensureDatabaseSchema(config: DatabaseConfig) {
     );
     await addColumnIfMissing(
       conn,
+      'ALTER TABLE projects ADD COLUMN proxy_url VARCHAR(512) NULL',
+    );
+    await addColumnIfMissing(
+      conn,
       'ALTER TABLE projects ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
     );
     await addColumnIfMissing(
       conn,
       'ALTER TABLE projects ADD COLUMN mock_key VARCHAR(64) NULL UNIQUE',
+    );
+    await addColumnIfMissing(
+      conn,
+      'ALTER TABLE projects ADD COLUMN default_mock_mode VARCHAR(50) NULL',
     );
 
     await conn.query(`

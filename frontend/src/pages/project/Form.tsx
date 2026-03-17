@@ -19,6 +19,7 @@ const ProjectFormPage: React.FC = () => {
     proxyUrl: '',
     members: '1',
     logo: '',
+    defaultMockMode: 'static',
   });
   const [uploading, setUploading] = useState(false);
   const initialLogoRef = useRef('');
@@ -48,12 +49,16 @@ const ProjectFormPage: React.FC = () => {
           name: string;
           description?: string | null;
           logoUrl?: string | null;
+          proxyUrl?: string | null;
+          defaultMockMode?: 'static' | 'script' | 'proxy';
         }>(`/api/projects/${id}`);
         setFormData((prev) => ({
           ...prev,
           name: data.name || '',
           description: data.description || '',
           logo: data.logoUrl || '',
+          proxyUrl: data.proxyUrl || '',
+          defaultMockMode: data.defaultMockMode || 'static',
         }));
         initialLogoRef.current = data.logoUrl || '';
         tempLogoRef.current = null;
@@ -87,6 +92,11 @@ const ProjectFormPage: React.FC = () => {
       return;
     }
 
+    if (!formData.proxyUrl.trim()) {
+      alert(t('proxyUrl') + ' ' + t('projectSaveError'));
+      return;
+    }
+
     try {
       const url = isEdit && id ? `/api/projects/${id}` : '/api/projects';
       const method = isEdit && id ? 'PUT' : 'POST';
@@ -99,6 +109,8 @@ const ProjectFormPage: React.FC = () => {
           name: formData.name,
           description: formData.description,
           logoUrl: formData.logo || undefined,
+          proxyUrl: formData.proxyUrl,
+          defaultMockMode: formData.defaultMockMode,
         }),
       });
       skipCleanupRef.current = true;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Globe, Info, LayoutGrid, Save, Users } from 'lucide-react';
+import { Globe, Info, LayoutGrid, Save, Users, Zap } from 'lucide-react';
 import SelectableInput from '../../components/SelectableInput';
 import type { ProjectFormData } from './types';
 
@@ -104,6 +104,42 @@ const ProjectFormFields: React.FC<ProjectFormFieldsProps> = ({
           }
           className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
           placeholder={t('proxyUrlPlaceholder')}
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <label className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+          <Zap size={12} />
+          {t('projectDefaultStrategy')}
+        </label>
+        <SelectableInput
+          options={[
+            t('projectDefaultStrategyStatic'),
+            t('projectDefaultStrategyScript'),
+            t('projectDefaultStrategyProxy'),
+          ]}
+          value={
+            formData.defaultMockMode === 'static'
+              ? t('projectDefaultStrategyStatic')
+              : formData.defaultMockMode === 'script'
+                ? t('projectDefaultStrategyScript')
+                : t('projectDefaultStrategyProxy')
+          }
+          onChange={(val) => {
+            const mapping: Record<string, 'static' | 'script' | 'proxy'> = {
+              [t('projectDefaultStrategyStatic')]: 'static',
+              [t('projectDefaultStrategyScript')]: 'script',
+              [t('projectDefaultStrategyProxy')]: 'proxy',
+            };
+            setFormData((prev) => ({
+              ...prev,
+              defaultMockMode: mapping[val] ?? 'static',
+            }));
+          }}
+          allowCustom={false}
+          showSearch={false}
+          size="md"
+          inputClassName="bg-slate-50"
         />
       </div>
 

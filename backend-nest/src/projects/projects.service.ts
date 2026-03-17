@@ -40,6 +40,7 @@ export class ProjectsService {
         description: p.description,
         createdAt: p.createdAt.toISOString(),
         logoUrl: p.logoUrl ?? null,
+        proxyUrl: (p as any).proxyUrl ?? null,
         mockKey: p.mockKey,
       })),
       '获取项目列表成功',
@@ -50,6 +51,7 @@ export class ProjectsService {
     const mockKey = `mk_${Math.random().toString(36).slice(2, 10)}${Date.now()
       .toString(36)
       .slice(-4)}`;
+    const defaultMockMode = dto.defaultMockMode ?? 'static';
     const project = await this.prisma.project.create({
       data: {
         name: dto.name,
@@ -57,7 +59,10 @@ export class ProjectsService {
         logoUrl: dto.logoUrl,
         ownerId,
         mockKey,
-      },
+        // defaultMockMode 尚未在 Prisma Client 类型中声明，这里通过 any 绕过类型限制
+        ...( { defaultMockMode } as any ),
+        ...(dto.proxyUrl ? ({ proxyUrl: dto.proxyUrl } as any) : {}),
+      } as any,
     });
 
     return ok(
@@ -67,7 +72,9 @@ export class ProjectsService {
         description: project.description,
         createdAt: project.createdAt.toISOString(),
         logoUrl: project.logoUrl ?? null,
+        proxyUrl: (project as any).proxyUrl ?? null,
         mockKey: project.mockKey,
+        defaultMockMode: (project as any).defaultMockMode ?? 'static',
       },
       '创建项目成功',
     );
@@ -86,7 +93,9 @@ export class ProjectsService {
         name: project.name,
         description: project.description,
         logoUrl: project.logoUrl ?? null,
+        proxyUrl: (project as any).proxyUrl ?? null,
         mockKey: project.mockKey,
+        defaultMockMode: (project as any).defaultMockMode ?? 'static',
       },
       '获取项目详情成功',
     );
@@ -110,7 +119,13 @@ export class ProjectsService {
         description:
           dto.description !== undefined ? dto.description : project.description,
         logoUrl: nextLogoUrl,
-      },
+        ...(dto.defaultMockMode !== undefined
+          ? ({ defaultMockMode: dto.defaultMockMode } as any)
+          : {}),
+        ...(dto.proxyUrl !== undefined
+          ? ({ proxyUrl: dto.proxyUrl || null } as any)
+          : {}),
+      } as any,
     });
 
     // 如果 logo 发生了变化，删除旧文件
@@ -124,7 +139,9 @@ export class ProjectsService {
         name: updated.name,
         description: updated.description,
         logoUrl: updated.logoUrl ?? null,
+        proxyUrl: (updated as any).proxyUrl ?? null,
         mockKey: updated.mockKey,
+        defaultMockMode: (updated as any).defaultMockMode ?? 'static',
       },
       '更新项目成功',
     );

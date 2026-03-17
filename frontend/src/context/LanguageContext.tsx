@@ -123,6 +123,11 @@ export const translations: Translations = {
   projectSaveError: { en: 'Network error, failed to save project', zh: '网络异常，无法保存项目' },
   projectLogoUploadError: { en: 'Network error, logo upload failed', zh: '网络异常，Logo 上传失败' },
 
+  projectDefaultStrategy: { en: 'Default Proxy Strategy', zh: '默认代理策略' },
+  projectDefaultStrategyStatic: { en: 'Static Mock', zh: '静态 Mock' },
+  projectDefaultStrategyScript: { en: 'Dynamic Mock Script', zh: '动态 Mock 脚本' },
+  projectDefaultStrategyProxy: { en: 'Real Service Proxy', zh: '真实服务代理' },
+
   // Public Assets
   publicAssetsTitle: { en: 'Public Assets', zh: '公共资产' },
   publicAssetsDesc: {
