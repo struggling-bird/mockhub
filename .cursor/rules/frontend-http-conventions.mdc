@@ -1,0 +1,86 @@
+---
+description: 前端接口请求封装与统一错误处理规范（React + TypeScript）
+globs: frontend/src/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+## 统一请求工具使用规范
+
+- 前端所有访问后端的请求必须通过 `frontend/src/utils/http.ts` 中的 `request` 方法完成，**禁止直接在业务组件中调用 `fetch`**（除非是特殊场景如文件下载且有明确理由）。
+
+```ts
+import { request, ApiError } from '../utils/http';
+
+const data = await request<MyDto[]>('/api/projects');
+```
+
+- 后端已约定统一响应壳结构：
+
+```ts
+interface ApiEnvelope<T = any> {
+  code: string;      // "0" 表示成功，其它为业务错误码
+  message: string;   // 中文提示信息
+  data: T | null;    // 真实数据
+  traceId?: string;  // 可选链路追踪 ID
+}
+```
+
+- `request<T>` 会自动：
+  - 从 `localStorage.mockhub_token` 读取 Token，并按需注入 `Authorization: Bearer xxx`
+  - 解析后端 JSON，校验 `code === '0' && HTTP 2xx`
+  - 返回 `data` 字段作为结果（类型为 `T`）
+  - 在失败时抛出 `ApiError`，内含 `status`、`code`、`message`、`traceId`
+
+## 具体约定
+
+- **鉴权接口**：
+
+```ts
+// 登录 / 注册：不携带已有 Token
+const data = await request<{ token: string }>('/api/auth/login', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(payload),
+  withAuth: false,
+});
+window.localStorage.setItem('mockhub_token', data.token);
+
+// 获取当前用户信息：使用默认 withAuth = true
+await request('/api/auth/me');
+```
+
+- **业务接口**（项目、接口管理等）：
+  - 一律只关心 `data`，错误通过捕获 `ApiError` 处理提示：
+
+```ts
+try {
+  const projects = await request<ProjectItem[]>('/api/projects');
+  setProjects(projects);
+} catch (err) {
+  if (err instanceof ApiError) {
+    showToast(err.message);
+  } else {
+    showToast('网络异常，请稍后重试');
+  }
+}
+```
+
+- **无需返回数据的操作**（删除、退出登录等）：
+
+```ts
+await request('/api/auth/logout', { method: 'POST' });
+await request(`/api/projects/${id}`, { method: 'DELETE' });
+```
+
+- **上传类接口**：
+  - 如 `/api/upload/logo` 仍然使用 `request<{ url: string }>`，`body` 为 `FormData`，无需手动设置 `Content-Type`。
+
+## 组件层最佳实践
+
+- 所有组件中如需调用接口：
+  - **统一引入 `request` 与可选 `ApiError`**
+  - 把错误提示委托给统一的提示组件或本地 `error` 状态，避免到处 `alert`
+- 当后端新增字段或调整响应结构时：
+  - 先更新对应的 TS 类型（如 `ProjectItem` / `ApiItem`）
+  - 确保 `request<T>` 的泛型参数同步更新，利用 TS 编译检查发现未处理字段。
+

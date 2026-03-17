@@ -1,0 +1,145 @@
+---
+description: 后端接口中文注释与文档规范（NestJS + Swagger）
+alwaysApply: true
+---
+
+## 接口文档总体要求
+
+- **中文为主**：所有对外接口的说明、字段描述必须使用简体中文，可在必要时补充英文。
+- **Swagger 完整描述**：所有接口必须通过 `@nestjs/swagger` 装饰器暴露到接口文档，包含：
+  - 控制器级别的 `@ApiTags('xxx')`（使用业务中文名，例如 `接口管理`、`项目管理`）
+  - 需要登录的接口使用 `@ApiBearerAuth()` 标记
+  - 每个接口方法使用 `@ApiOperation({ summary, description })`，`summary` 为一句话中文摘要，`description` 可补充详细说明
+  - 使用 `@ApiResponse` 或 DTO 上的属性装饰器描述响应结构与示例
+
+## DTO 与字段说明规范
+
+- **请求 DTO**
+  - 对应 `body` 的 DTO 使用：
+    - `@ApiProperty` / `@ApiPropertyOptional` 必须填写 `description`（中文字段说明）
+    - 尽量提供 `example` 字段，给出典型示例值
+  - 对应 `query` / `params` 建议单独建 DTO，并在控制器方法使用 `@Query()` / `@Param()` + DTO 绑定；如果暂时不拆 DTO，至少在接口说明的「请求参数结构」里补充字段描述。
+
+- **响应 DTO**
+  - 为每类接口响应定义专门 DTO（例如 `GetUserProfileResponseDto`）
+  - 所有字段使用 `@ApiProperty` / `@ApiPropertyOptional`：
+    - 必须有中文 `description`
+    - 尽量写上 `example`
+  - 通用响应壳（如 `{ code, message, data }`）建议抽成公共 DTO 并复用。
+
+示例（请求 + 响应 DTO）：
+
+```ts
+export class GetProfileResponseDto {
+  @ApiProperty({ description: '用户唯一 ID', example: 'user_123' })
+  id: string;
+
+  @ApiProperty({ description: '用户邮箱', example: 'user@example.com' })
+  email: string;
+}
+```
+
+## 控制器接口注释规范
+
+- 每个路由方法必须：
+  - 使用 `@ApiOperation({ summary: '中文摘要', description: '可选中文长描述' })`
+  - 使用 `@ApiResponse` 标记成功/失败的响应结构（至少 200 成功响应），其中 `type` 指向响应 DTO
+  - 使用 `@ApiBearerAuth()` 标记需要鉴权的接口
+  - 在实现代码上方可以视情况增加简短中文注释，补充 Swagger 不易表达的业务约束
+
+控制器示例（简化）：
+
+```ts
+@ApiTags('接口管理')
+@ApiBearerAuth()
+@Controller('projects/:projectId/apis')
+export class ApisController {
+  @Get()
+  @ApiOperation({ summary: '获取项目下接口列表', description: '按更新时间倒序返回接口基础信息列表。' })
+  @ApiResponse({ status: 200, description: '接口列表获取成功', type: ApiListItemDto, isArray: true })
+  async list(...) { ... }
+}
+```
+
+## 请求参数结构与示例数据
+
+- **请求参数结构** 需要在 Swagger 中清晰可见：
+  - `body`：通过请求 DTO + `@ApiProperty` 的 `description` 和 `example` 表达
+  - `query` / `params`：推荐使用 DTO 绑定并加装饰器；如果使用简单类型，至少在 `@ApiOperation.description` 中补充字段列表说明
+- **示例数据要求**：
+  - DTO 上 `example` 尽量贴近真实业务，例如：
+    - ID 类：`proj_123456` / `user_abcdef`
+    - 时间：`2024-01-01T00:00:00.000Z`
+    - 状态类字段：写出实际可取值示例
+
+## 响应结构与示例数据
+
+- 每个接口的响应结构必须通过 Swagger 明确定义：
+  - 对应 DTO 上使用中文 `description` + `example`
+  - 如响应为列表，DTO 字段应表述为「xxx 列表」并给出 1~2 条示例
+- 如接口存在错误码，需要：
+  - 在接口 `@ApiResponse` 中增加错误响应说明，或在公共文档中总结常见错误码
+
+### 统一响应封装结构
+
+- 后端所有业务接口（除少数特殊场景，如文件流下载）应统一使用如下响应壳结构：
+
+```ts
+export class ApiResponseEnvelope<T> {
+  code: string;   // 业务状态码，"0" 表示成功，其余为错误码（如 "AUTH_401"）
+  message: string; // 人类可读的中文提示信息
+  data: T | null;  // 具体业务数据，失败时通常为 null
+  traceId?: string; // 可选的链路追踪 ID，便于排查问题
+}
+```
+
+- 约定：
+  - **成功**：`code === '0'`，`message` 为简短中文成功提示（例如「操作成功」），`data` 为实际业务数据。
+  - **失败**：`code !== '0'`，`message` 为错误描述，`data` 通常为 `null` 或包含少量补充信息。
+
+- 在 Swagger 中的使用方式：
+  - 对于简单业务类型，如 `ProjectSummaryDto`：
+
+```ts
+@ApiResponse({
+  status: 200,
+  description: '项目列表获取成功。',
+  schema: {
+    allOf: [
+      { $ref: getSchemaPath(ApiResponseEnvelope) },
+      {
+        properties: {
+          data: {
+            type: 'array',
+            items: { $ref: getSchemaPath(ProjectSummaryDto) },
+            description: '项目列表',
+          },
+        },
+      },
+    ],
+  },
+})
+```
+
+  - 或者定义泛型包裹 DTO，例如：
+
+```ts
+export class ProjectListResponseDto extends ApiResponseEnvelope<ProjectSummaryDto[]> {}
+```
+
+  然后在 `@ApiResponse` 中直接使用 `type: ProjectListResponseDto`。
+
+- 前端在处理接口响应时，统一遵循：
+  - 先判断 `code === '0'` 再读取 `data`
+  - 将 `message` 用于通知/错误提示文案
+  - 如存在 `traceId`，在错误提示中附带，方便运维排查。
+
+## 前后端接口字段对齐
+
+- 当前项目前端使用 TypeScript 类型描述 API 返回值（如 `frontend/src/types.ts`），后端新增/修改字段时必须同步：
+  - 更新前端类型定义，确保字段名、可空性与后端一致
+  - 如字段为枚举，前端也应使用联合类型或枚举表示
+- 修改接口时应遵循「向后兼容优先」：
+  - 尽量通过新增字段而不是修改语义
+  - 确需破坏性变更时，需在接口文档中明确标注，并视情况增加新版本路径。
+

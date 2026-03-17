@@ -3,6 +3,7 @@ import { FolderPlus, UserPlus, MoreVertical, Users, LayoutGrid, Edit3, Key, Copy
 import { useLanguage } from '../context/LanguageContext';
 import { Link } from 'react-router-dom';
 import { normalizeLogoUrlForPreview } from '../utils/logoUrl';
+import { request, ApiError } from '../utils/http';
 
 interface ProjectItem {
   id: string;
@@ -20,27 +21,16 @@ const ProjectManagement: React.FC = () => {
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = window.localStorage.getItem('mockhub_token');
-    if (!token) {
-      setLoading(false);
-      return;
-    }
     (async () => {
       try {
-        const res = await fetch('/api/projects', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          setError(data.message || '加载项目列表失败');
+        const data = await request<ProjectItem[]>('/api/projects');
+        setProjects(data);
+      } catch (err) {
+        if (err instanceof ApiError) {
+          setError(err.message || '加载项目列表失败');
         } else {
-          const data = (await res.json()) as ProjectItem[];
-          setProjects(data);
+          setError('网络异常，无法加载项目列表');
         }
-      } catch {
-        setError('网络异常，无法加载项目列表');
       } finally {
         setLoading(false);
       }
@@ -137,29 +127,19 @@ const ProjectManagement: React.FC = () => {
                           setMenuOpenId(null);
                           return;
                         }
-                        const token = window.localStorage.getItem('mockhub_token');
-                        if (!token) {
-                          setMenuOpenId(null);
-                          return;
-                        }
                         try {
-                          const res = await fetch(`/api/projects/${project.id}`, {
+                          await request(`/api/projects/${project.id}`, {
                             method: 'PUT',
                             headers: {
                               'Content-Type': 'application/json',
-                              Authorization: `Bearer ${token}`,
                             },
                             body: JSON.stringify({ name }),
                           });
-                          if (res.ok) {
-                            setProjects((prev) =>
-                              prev.map((p) =>
-                                p.id === project.id ? { ...p, name } : p,
-                              ),
-                            );
-                          } else {
-                            alert('重命名失败');
-                          }
+                          setProjects((prev) =>
+                            prev.map((p) =>
+                              p.id === project.id ? { ...p, name } : p,
+                            ),
+                          );
                         } catch {
                           alert('网络异常，重命名失败');
                         } finally {
@@ -176,25 +156,13 @@ const ProjectManagement: React.FC = () => {
                           setMenuOpenId(null);
                           return;
                         }
-                        const token = window.localStorage.getItem('mockhub_token');
-                        if (!token) {
-                          setMenuOpenId(null);
-                          return;
-                        }
                         try {
-                          const res = await fetch(`/api/projects/${project.id}`, {
+                          await request(`/api/projects/${project.id}`, {
                             method: 'DELETE',
-                            headers: {
-                              Authorization: `Bearer ${token}`,
-                            },
                           });
-                          if (res.ok) {
-                            setProjects((prev) =>
-                              prev.filter((p) => p.id !== project.id),
-                            );
-                          } else {
-                            alert('删除失败');
-                          }
+                          setProjects((prev) =>
+                            prev.filter((p) => p.id !== project.id),
+                          );
                         } catch {
                           alert('网络异常，删除失败');
                         } finally {

@@ -16,6 +16,7 @@ import ProjectForm from './pages/ProjectForm';
 import Auth from './pages/Auth';
 import { Bell, ChevronDown } from 'lucide-react';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
+import { request, ApiError } from './utils/http';
 
 function AppContent() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -36,18 +37,10 @@ function AppContent() {
     }
     (async () => {
       try {
-        const res = await fetch('/api/auth/me', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (res.ok) {
-          setIsAuthenticated(true);
-        } else {
-          window.localStorage.removeItem('mockhub_token');
-        }
-      } catch {
-        // 网络异常时不强制退出登录，仅保持当前状态
+        await request('/api/auth/me');
+        setIsAuthenticated(true);
+      } catch (err) {
+        window.localStorage.removeItem('mockhub_token');
       } finally {
         setAuthChecked(true);
       }
@@ -57,17 +50,11 @@ function AppContent() {
   // 加载项目列表，用于顶部项目选择器
   useEffect(() => {
     if (!isAuthenticated) return;
-    const token = window.localStorage.getItem('mockhub_token');
-    if (!token) return;
     (async () => {
       try {
-        const res = await fetch('/api/projects', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (!res.ok) return;
-        const data = (await res.json()) as { id: string; name: string }[];
+        const data = await request<{ id: string; name: string }[]>(
+          '/api/projects',
+        );
         setProjects(data);
         if (!currentProjectId && data.length > 0) {
           setCurrentProjectId(data[0].id);
@@ -81,18 +68,10 @@ function AppContent() {
   }, [isAuthenticated]);
 
   const handleLogout = async () => {
-    const token = window.localStorage.getItem('mockhub_token');
     window.localStorage.removeItem('mockhub_token');
     setIsAuthenticated(false);
     try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: token
-          ? {
-              Authorization: `Bearer ${token}`,
-            }
-          : undefined,
-      });
+      await request('/api/auth/logout', { method: 'POST' });
     } catch {
       // 忽略网络错误
     }

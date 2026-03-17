@@ -8,6 +8,7 @@ import type { ApiItem, ApiHeaderRow, ApiSchemaRow, ApiMockMode } from '../types'
 import SelectableInput from '../components/SelectableInput';
 import { useLanguage } from '../context/LanguageContext';
 import { formatLastCall } from '../utils/relativeTime';
+import { request } from '../utils/http';
 
 const ApiTable: React.FC = () => {
   const projectId = window.localStorage.getItem('mockhub_project_id');
@@ -48,25 +49,20 @@ const ApiTable: React.FC = () => {
       setLoading(false);
       return;
     }
-    const token = window.localStorage.getItem('mockhub_token');
-    if (!token) {
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     try {
-      const res = await fetch(`/api/projects/${projectId}/apis`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = (await res.json()) as (Omit<ApiItem, 'lastCall'> & { lastCall: string })[];
-        setApis(data.map((a) => ({ ...a, lastCall: formatLastCall(a.lastCall) || t('lastCallNever') })));
-        setSelectedApiId((prev) =>
-          prev && data.some((d) => d.id === prev) ? prev : data[0]?.id ?? null,
-        );
-      } else {
-        setApis([]);
-      }
+      const data = await request<
+        (Omit<ApiItem, 'lastCall'> & { lastCall: string })[]
+      >(`/api/projects/${projectId}/apis`);
+      setApis(
+        data.map((a) => ({
+          ...a,
+          lastCall: formatLastCall(a.lastCall) || t('lastCallNever'),
+        })),
+      );
+      setSelectedApiId((prev) =>
+        prev && data.some((d) => d.id === prev) ? prev : data[0]?.id ?? null,
+      );
     } catch {
       setApis([]);
     } finally {
@@ -84,50 +80,42 @@ const ApiTable: React.FC = () => {
       setDetail(null);
       return;
     }
-    const token = window.localStorage.getItem('mockhub_token');
-    if (!token) return;
-
     const loadDetail = async () => {
       setDetailLoading(true);
       try {
-        const res = await fetch(
+        const data = await request<ApiItem>(
           `/api/projects/${projectId}/apis/${selectedApi.id}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          },
         );
-        if (res.ok) {
-          const data = (await res.json()) as ApiItem;
-          setDetail(data);
-          setEditName(data.name);
-          setEditPath(data.path || '/api/v1');
-          setEditMethod(data.method);
-          setEditStatus(data.status);
-          setResponseMode((data.mockMode as ApiMockMode) || 'static');
-          setProxyUrl(
-            data.mockProxyUrl || 'https://api.production.com',
-          );
-          setRequestHeaders(data.requestHeaders || []);
-          setResponseHeaders(data.responseHeaders || []);
-          setRequestParams(data.requestParams || []);
-          setResponseSchema(data.responseSchema || []);
-          setMockStaticBody(
-            data.mockStaticBody ||
-              JSON.stringify(
-                {
-                  status: 'success',
-                  data: {
-                    id: 'user_9921',
-                    name: 'John Doe',
-                  },
+        setDetail(data);
+        setEditName(data.name);
+        setEditPath(data.path || '/api/v1');
+        setEditMethod(data.method);
+        setEditStatus(data.status);
+        setResponseMode((data.mockMode as ApiMockMode) || 'static');
+        setProxyUrl(
+          data.mockProxyUrl || 'https://api.production.com',
+        );
+        setRequestHeaders(data.requestHeaders || []);
+        setResponseHeaders(data.responseHeaders || []);
+        setRequestParams(data.requestParams || []);
+        setResponseSchema(data.responseSchema || []);
+        setMockStaticBody(
+          data.mockStaticBody ||
+            JSON.stringify(
+              {
+                status: 'success',
+                data: {
+                  id: 'user_9921',
+                  name: 'John Doe',
                 },
-                null,
-                2,
-              ),
-          );
-          setMockScript(
-            data.mockScript ||
-              `/**
+              },
+              null,
+              2,
+            ),
+        );
+        setMockScript(
+          data.mockScript ||
+            `/**
  * @param {Request} req - Incoming request
  * @param {Response} res - Response helper
  */
@@ -154,8 +142,7 @@ export default function(req, res) {
     }
   });
 }`,
-          );
-        }
+        );
       } finally {
         setDetailLoading(false);
       }
@@ -166,14 +153,11 @@ export default function(req, res) {
 
   const handleSave = async () => {
     if (!selectedApi || !projectId) return;
-    const token = window.localStorage.getItem('mockhub_token');
-    if (!token) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/projects/${projectId}/apis/${selectedApi.id}`, {
+      await request(`/api/projects/${projectId}/apis/${selectedApi.id}`, {
         method: 'PUT',
         headers: {
-          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -191,9 +175,7 @@ export default function(req, res) {
           mockProxyUrl: proxyUrl,
         }),
       });
-      if (res.ok) {
-        await fetchApis();
-      }
+      await fetchApis();
     } finally {
       setSaving(false);
     }
@@ -201,19 +183,14 @@ export default function(req, res) {
 
   const handleDelete = async () => {
     if (!selectedApi || !projectId) return;
-    const token = window.localStorage.getItem('mockhub_token');
-    if (!token) return;
     if (!window.confirm(t('interfaceSaveChanges') ? 'Delete this interface?' : '确定删除该接口？')) return;
     try {
-      const res = await fetch(`/api/projects/${projectId}/apis/${selectedApi.id}`, {
+      await request(`/api/projects/${projectId}/apis/${selectedApi.id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) {
-        const next = apis.filter((a) => a.id !== selectedApi.id);
-        setApis(next);
-        setSelectedApiId(next[0]?.id ?? null);
-      }
+      const next = apis.filter((a) => a.id !== selectedApi.id);
+      setApis(next);
+      setSelectedApiId(next[0]?.id ?? null);
     } catch {
       // ignore
     }
@@ -221,13 +198,10 @@ export default function(req, res) {
 
   const handleCreate = async () => {
     if (!projectId) return;
-    const token = window.localStorage.getItem('mockhub_token');
-    if (!token) return;
     try {
-      const res = await fetch(`/api/projects/${projectId}/apis`, {
+      await request(`/api/projects/${projectId}/apis`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -236,13 +210,11 @@ export default function(req, res) {
           method: newMethod,
         }),
       });
-      if (res.ok) {
-        setShowNewForm(false);
-        setNewName('');
-        setNewPath('/api/v1');
-        setNewMethod('GET');
-        await fetchApis();
-      }
+      setShowNewForm(false);
+      setNewName('');
+      setNewPath('/api/v1');
+      setNewMethod('GET');
+      await fetchApis();
     } catch {
       // ignore
     }

@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model User {
+  id        String    @id @map("id")
+  email     String    @unique @map("email")
+  password  String    @map("password")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  projects  Project[]
+
+  @@map("users")
+}
+
+model Project {
+  id          String      @id @default(cuid())
+  name        String
+  description String?
+  logoUrl     String?     @map("logo_url")
+  ownerId     String      @map("owner_id")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  apis        ProjectApi[]
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  @@map("projects")
+}
+
+model ProjectApi {
+  id        String   @id @default(cuid())
+  projectId String   @map("project_id")
+  name      String
+  path      String
+  method    String
+  status    String   @default("New")
+
+  // 接口文档 & Mock 相关配置，统一存为 JSON/TEXT
+  requestHeaders   String? @map("request_headers")
+  requestParams    String? @map("request_params")
+  responseHeaders  String? @map("response_headers")
+  responseSchema   String? @map("response_schema")
+  mockStaticBody   String? @map("mock_static_body")
+  mockScript       String? @map("mock_script")
+  mockMode         String? @map("mock_mode")
+  mockProxyUrl     String? @map("mock_proxy_url")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("project_apis")
+}

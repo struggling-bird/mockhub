@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, Lock, User, Building, Zap, ArrowRight } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { request, ApiError } from '../utils/http';
 
 interface AuthProps {
   onLogin: () => void;
@@ -27,30 +28,27 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         ? { email, password }
         : { email, password, username, company };
 
-      const res = await fetch(endpoint, {
+      const data = await request<{ token: string }> (endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(body),
+        withAuth: false,
       });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.message || (isLogin ? '登录失败，请检查邮箱或密码' : '注册失败，请稍后重试'));
-        setLoading(false);
-        return;
-      }
-
-      const data = await res.json();
-      if (data.token) {
+      if (data?.token) {
         window.localStorage.setItem('mockhub_token', data.token);
       }
       setLoading(false);
       onLogin();
-    } catch (err) {
-      console.error(err);
-      setError('网络异常，请稍后重试');
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        setError(err.message || (isLogin ? '登录失败，请检查邮箱或密码' : '注册失败，请稍后重试'));
+      } else {
+        console.error(err);
+        setError('网络异常，请稍后重试');
+      }
       setLoading(false);
     }
   };

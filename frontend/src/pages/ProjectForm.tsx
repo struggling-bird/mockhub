@@ -4,6 +4,7 @@ import { Save, X, ArrowLeft, LayoutGrid, Info, Globe, Users, Key, Copy, CheckCir
 import { useLanguage } from '../context/LanguageContext';
 import SelectableInput from '../components/SelectableInput';
 import { normalizeLogoUrlForPreview } from '../utils/logoUrl';
+import { request } from '../utils/http';
 
 const ProjectForm: React.FC = () => {
   const { t } = useLanguage();
@@ -25,15 +26,11 @@ const ProjectForm: React.FC = () => {
 
   const cleanupLogo = async (logoUrl?: string | null) => {
     if (!logoUrl) return;
-    const token = window.localStorage.getItem('mockhub_token');
-    if (!token) return;
-
     try {
-      await fetch('/api/upload/logo/cleanup', {
+      await request('/api/upload/logo/cleanup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ url: logoUrl }),
       });
@@ -44,20 +41,13 @@ const ProjectForm: React.FC = () => {
 
   useEffect(() => {
     if (!isEdit || !id) return;
-    const token = window.localStorage.getItem('mockhub_token');
-    if (!token) {
-      navigate('/');
-      return;
-    }
     (async () => {
       try {
-        const res = await fetch(`/api/projects/${id}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (!res.ok) return;
-        const data = await res.json();
+        const data = await request<{
+          name: string;
+          description?: string | null;
+          logoUrl?: string | null;
+        }>(`/api/projects/${id}`);
         setFormData((prev) => ({
           ...prev,
           name: data.name || '',
@@ -99,11 +89,10 @@ const ProjectForm: React.FC = () => {
     try {
       const url = isEdit && id ? `/api/projects/${id}` : '/api/projects';
       const method = isEdit && id ? 'PUT' : 'POST';
-      const res = await fetch(url, {
+      await request(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           name: formData.name,
@@ -111,11 +100,6 @@ const ProjectForm: React.FC = () => {
           logoUrl: formData.logo || undefined,
         }),
       });
-      if (!res.ok) {
-        // 简单失败提示，后续可做成 toast
-        alert('保存项目失败，请稍后重试');
-        return;
-      }
       skipCleanupRef.current = true;
       initialLogoRef.current = formData.logo || '';
       tempLogoRef.current = null;
@@ -183,25 +167,20 @@ const ProjectForm: React.FC = () => {
                     try {
                       const fd = new FormData();
                       fd.append('file', file);
-                      const res = await fetch('/api/upload/logo', {
-                        method: 'POST',
-                        headers: {
-                          Authorization: `Bearer ${token}`,
+                      const data = await request<{ url: string }>(
+                        '/api/upload/logo',
+                        {
+                          method: 'POST',
+                          body: fd,
                         },
-                        body: fd,
-                      });
-                      if (!res.ok) {
-                        alert('Logo 上传失败，请稍后重试');
-                      } else {
-                        const data = await res.json();
-                        const previousTempLogo = tempLogoRef.current;
-                        if (previousTempLogo && previousTempLogo !== data.url) {
-                          await cleanupLogo(previousTempLogo);
-                        }
-                        tempLogoRef.current = data.url;
-                        skipCleanupRef.current = false;
-                        setFormData((prev) => ({ ...prev, logo: data.url }));
+                      );
+                      const previousTempLogo = tempLogoRef.current;
+                      if (previousTempLogo && previousTempLogo !== data.url) {
+                        await cleanupLogo(previousTempLogo);
                       }
+                      tempLogoRef.current = data.url;
+                      skipCleanupRef.current = false;
+                      setFormData((prev) => ({ ...prev, logo: data.url }));
                     } catch {
                       alert('网络异常，Logo 上传失败');
                     } finally {
