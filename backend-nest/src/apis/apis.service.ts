@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateApiDto } from './dto/create-api.dto';
 import { UpdateApiDto } from './dto/update-api.dto';
+import { ApiProxyRequestDto } from './dto/proxy-request.dto';
 import { ok } from '../common/api-response';
 
 @Injectable()
@@ -226,5 +227,76 @@ export class ApisService {
     }
     await this.prisma.projectApi.delete({ where: { id: apiId } });
     return ok({ success: true }, '删除接口成功');
+  }
+
+  async proxyRequest(
+    ownerId: string,
+    projectId: string,
+    apiId: string,
+    dto: ApiProxyRequestDto,
+  ) {
+    await this.ensureProjectOwned(ownerId, projectId);
+    const api = await this.prisma.projectApi.findFirst({
+      where: { id: apiId, projectId },
+      select: { id: true },
+    });
+    if (!api) {
+      throw new NotFoundException('API not found');
+    }
+
+    if (!dto.url) {
+      throw new BadRequestException('Target URL is required');
+    }
+
+    let targetUrl: URL;
+    try {
+      targetUrl = new URL(dto.url);
+    } catch {
+      throw new BadRequestException('Target URL is invalid');
+    }
+
+    Object.entries(dto.query ?? {}).forEach(([key, value]) => {
+      if (key) {
+        targetUrl.searchParams.set(key, value);
+      }
+    });
+
+    const headers = new Headers();
+    Object.entries(dto.headers ?? {}).forEach(([key, value]) => {
+      if (key && value !== undefined) {
+        headers.set(key, value);
+      }
+    });
+
+    const init: RequestInit = {
+      method: dto.method || 'GET',
+      headers,
+      redirect: 'follow',
+    };
+
+    if (
+      dto.body !== undefined &&
+      dto.body !== null &&
+      !['GET', 'HEAD'].includes((dto.method || 'GET').toUpperCase())
+    ) {
+      init.body = dto.body;
+    }
+
+    const response = await fetch(targetUrl.toString(), init);
+    const body = await response.text();
+
+    return ok(
+      {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Array.from(response.headers.entries()).map(([key, value]) => ({
+          key,
+          value,
+        })),
+        body,
+        contentType: response.headers.get('content-type'),
+      },
+      '真实代理请求成功',
+    );
   }
 }

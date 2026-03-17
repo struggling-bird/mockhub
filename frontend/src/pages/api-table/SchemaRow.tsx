@@ -9,6 +9,8 @@ interface SchemaRowProps {
   onDelete?: () => void;
   descriptionPlaceholder: string;
   onAddChild?: () => void;
+  showValueInput?: boolean;
+  valuePlaceholder?: string;
 }
 
 const SchemaRow: React.FC<SchemaRowProps> = ({
@@ -17,6 +19,8 @@ const SchemaRow: React.FC<SchemaRowProps> = ({
   onDelete,
   descriptionPlaceholder,
   onAddChild,
+  showValueInput = false,
+  valuePlaceholder = '',
 }) => (
   <tr className="hover:bg-slate-50/50 group">
     <td className="px-3 py-1.5">
@@ -62,6 +66,17 @@ const SchemaRow: React.FC<SchemaRowProps> = ({
         className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
       />
     </td>
+    {showValueInput && (
+      <td className="px-3 py-1.5">
+        <input
+          type="text"
+          value={row.value || ''}
+          onChange={(e) => onChange({ ...row, value: e.target.value })}
+          placeholder={valuePlaceholder}
+          className="w-full bg-transparent outline-none text-slate-600 text-xs font-mono"
+        />
+      </td>
+    )}
     <td className="px-3 py-1.5">
       <div className="flex items-center gap-1.5">
         <input

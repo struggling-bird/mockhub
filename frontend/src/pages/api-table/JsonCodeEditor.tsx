@@ -1,25 +1,37 @@
 import React, { useMemo, useRef } from 'react';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface JsonCodeEditorProps {
   value: string;
   onChange: (value: string) => void;
   onBlur?: () => void;
   minHeightClassName?: string;
+  readOnly?: boolean;
 }
 
 const tokenRegex =
   /("(?:[^"\\]|\\.)*"(?=\s*:))|("(?:[^"\\]|\\.)*")|(\btrue\b|\bfalse\b|null\b)|(\b-?\d+(?:\.\d+)?\b)|([{}\[\]:,])/g;
+const LARGE_TEXT_THRESHOLD = 120000;
+const LARGE_LINE_THRESHOLD = 3000;
 
 const JsonCodeEditor: React.FC<JsonCodeEditorProps> = ({
   value,
   onChange,
   onBlur,
   minHeightClassName = 'min-h-[320px]',
+  readOnly = false,
 }) => {
+  const { t } = useLanguage();
   const highlightRef = useRef<HTMLPreElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const shouldUseLightweightMode =
+    value.length > LARGE_TEXT_THRESHOLD || value.split('\n').length > LARGE_LINE_THRESHOLD;
 
   const highlightedLines = useMemo(() => {
+    if (shouldUseLightweightMode) {
+      return null;
+    }
+
     return value.split('\n').map((line, lineIndex) => {
       const nodes: React.ReactNode[] = [];
       let lastIndex = 0;
@@ -73,7 +85,7 @@ const JsonCodeEditor: React.FC<JsonCodeEditorProps> = ({
         </div>
       );
     });
-  }, [value]);
+  }, [shouldUseLightweightMode, value]);
 
   const syncScroll = () => {
     if (!highlightRef.current || !textareaRef.current) return;
@@ -85,13 +97,19 @@ const JsonCodeEditor: React.FC<JsonCodeEditorProps> = ({
     <div
       className={`relative overflow-hidden rounded-xl border border-slate-800 bg-slate-950 ${minHeightClassName}`}
     >
-      <pre
-        ref={highlightRef}
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 overflow-auto p-3 font-mono text-[11px] leading-6 text-slate-200"
-      >
-        {highlightedLines}
-      </pre>
+      {shouldUseLightweightMode ? (
+        <div className="absolute left-3 right-3 top-2 z-10 text-[10px] text-amber-300">
+          {t('jsonLargeModeHint')}
+        </div>
+      ) : (
+        <pre
+          ref={highlightRef}
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 overflow-auto p-3 font-mono text-[11px] leading-6 text-slate-200"
+        >
+          {highlightedLines}
+        </pre>
+      )}
       <textarea
         ref={textareaRef}
         value={value}
@@ -100,7 +118,18 @@ const JsonCodeEditor: React.FC<JsonCodeEditorProps> = ({
         onScroll={syncScroll}
         spellCheck={false}
         wrap="off"
-        className="absolute inset-0 resize-none overflow-auto bg-transparent p-3 font-mono text-[11px] leading-6 text-transparent caret-slate-100 selection:bg-blue-500/30 focus:outline-none"
+        readOnly={readOnly}
+        className={`absolute inset-0 resize-none overflow-auto bg-transparent p-3 font-mono text-[11px] leading-6 selection:bg-blue-500/30 focus:outline-none ${
+          shouldUseLightweightMode ? 'text-slate-200' : 'text-transparent'
+        } ${
+          shouldUseLightweightMode
+            ? readOnly
+              ? 'pt-7 caret-transparent'
+              : 'pt-7 caret-slate-100'
+            : readOnly
+              ? 'caret-transparent'
+              : 'caret-slate-100'
+        }`}
       />
     </div>
   );

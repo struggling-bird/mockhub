@@ -1,5 +1,5 @@
 import React from 'react';
-import { Info, Zap } from 'lucide-react';
+import { Info, LoaderCircle, Send, Zap } from 'lucide-react';
 import type { ApiItem, ApiMockMode } from '../../types';
 import SelectableInput from '../../components/SelectableInput';
 
@@ -16,6 +16,8 @@ interface ApiBasicInfoSectionProps {
   proxyUrl: string;
   setProxyUrl: (value: string) => void;
   proxyOptions: string[];
+  onSendProxyRequest: () => void;
+  proxyRequestLoading: boolean;
 }
 
 const ApiBasicInfoSection: React.FC<ApiBasicInfoSectionProps> = ({
@@ -31,6 +33,8 @@ const ApiBasicInfoSection: React.FC<ApiBasicInfoSectionProps> = ({
   proxyUrl,
   setProxyUrl,
   proxyOptions,
+  onSendProxyRequest,
+  proxyRequestLoading,
 }) => {
   return (
     <section className="space-y-1.5">
@@ -119,14 +123,31 @@ const ApiBasicInfoSection: React.FC<ApiBasicInfoSectionProps> = ({
 
           {responseMode === 'proxy' && (
             <div className="flex-1 animate-in fade-in slide-in-from-left-2 duration-300">
-              <SelectableInput
-                options={proxyOptions}
-                value={proxyUrl}
-                onChange={setProxyUrl}
-                size="sm"
-                placeholder={t('proxyUrlSelectPlaceholder')}
-                inputClassName="text-[10px]"
-              />
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <SelectableInput
+                    options={proxyOptions}
+                    value={proxyUrl}
+                    onChange={setProxyUrl}
+                    size="sm"
+                    placeholder={t('proxyUrlSelectPlaceholder')}
+                    inputClassName="text-[10px]"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={onSendProxyRequest}
+                  disabled={proxyRequestLoading}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-[10px] font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+                >
+                  {proxyRequestLoading ? (
+                    <LoaderCircle size={12} className="animate-spin" />
+                  ) : (
+                    <Send size={12} />
+                  )}
+                  {proxyRequestLoading ? t('mockProxySending') : t('mockProxySend')}
+                </button>
+              </div>
             </div>
           )}
         </div>

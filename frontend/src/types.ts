@@ -31,6 +31,7 @@ export interface ApiSchemaRow {
   type: 'string' | 'number' | 'boolean' | 'object' | 'array' | 'integer';
   required: boolean;
   desc?: string;
+  value?: string;
   depth?: number;
   section?: 'query' | 'body' | 'response';
 }

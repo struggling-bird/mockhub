@@ -15,7 +15,9 @@ dotenv.config({ path: '.env' });
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter(),
+    new FastifyAdapter({
+      bodyLimit: 20 * 1024 * 1024,
+    }),
   );
 
   const instance = app.getHttpAdapter().getInstance();

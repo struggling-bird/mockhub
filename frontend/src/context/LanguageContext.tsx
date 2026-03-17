@@ -216,6 +216,41 @@ export const translations: Translations = {
     zh: '切换到 Mock 模式',
   },
   mockProxyRun: { en: 'Run Interface', zh: '运行接口' },
+  mockProxyRequestTitle: { en: 'Real Request', zh: '真实请求' },
+  mockProxyRequestUrl: { en: 'Request URL', zh: '请求地址' },
+  mockProxyRequestMethod: { en: 'Method', zh: '请求方法' },
+  mockProxyRequestQuery: { en: 'Query Params', zh: '查询参数' },
+  mockProxyRequestBody: { en: 'Request Body', zh: '请求体' },
+  mockProxySend: { en: 'Send Request', zh: '发送请求' },
+  mockProxySending: { en: 'Sending...', zh: '请求中...' },
+  mockProxyResponseTitle: { en: 'Real Response', zh: '真实响应' },
+  mockProxyResponseStatus: { en: 'Status', zh: '状态码' },
+  mockProxyResponseData: { en: 'Response Body', zh: '响应数据' },
+  mockProxySaveStatic: { en: 'Save as Static Mock', zh: '保存为静态 Mock' },
+  mockProxySaveSuccess: {
+    en: 'Saved current response as static mock.',
+    zh: '已将当前响应保存为静态 Mock。',
+  },
+  mockProxyRequestError: {
+    en: 'Real proxy request failed.',
+    zh: '真实代理请求失败。',
+  },
+  mockProxyNoResponse: {
+    en: 'No response yet. Send a real request first.',
+    zh: '暂无响应数据，请先发送真实请求。',
+  },
+  mockProxyApplySchema: {
+    en: 'Detected response headers and schema.',
+    zh: '已自动解析响应头和响应结构。',
+  },
+  mockProxyUseTabsHint: {
+    en: 'Edit request headers and params in the existing tabs, then send the request from the proxy URL area.',
+    zh: '请求头、请求参数与响应结构均复用现有 Tab 维护，请在代理地址区域直接发送请求。',
+  },
+  jsonLargeModeHint: {
+    en: 'Large content detected. Switched to lightweight rendering mode.',
+    zh: '检测到大体量内容，已切换为轻量渲染模式。',
+  },
   mockDynamicTitle: {
     en: 'Dynamic Mock Script (Node.js)',
     zh: '动态 Mock 脚本（Node.js）',

@@ -5,9 +5,9 @@ import {
   CheckCircle2,
   Copy,
   FileJson,
+  LoaderCircle,
   Plus,
   Save,
-  Server,
   Terminal,
   Zap,
 } from 'lucide-react';
@@ -28,7 +28,6 @@ interface ApiTabContentProps {
   setResponseSchema: React.Dispatch<React.SetStateAction<ApiSchemaRow[]>>;
   responseMode: ApiMockMode;
   setResponseMode: (value: ApiMockMode) => void;
-  proxyUrl: string;
   mockStaticBody: string;
   setMockStaticBody: (value: string) => void;
   mockScript: string;
@@ -38,6 +37,20 @@ interface ApiTabContentProps {
   addQueryParamField: () => void;
   addBodyField: () => void;
   addResponseField: () => void;
+  onPersistStaticMockFromProxy: (payload: {
+    mockStaticBody: string;
+    responseHeaders: ApiHeaderRow[];
+    responseSchema: ApiSchemaRow[];
+    responseMode: 'static';
+  }) => Promise<void> | void;
+  proxyResponseStatus: number | null;
+  proxyResponseStatusText: string;
+  proxyResponseBody: string;
+  proxyResponseFeedback: {
+    type: 'info' | 'success' | 'error';
+    message: string;
+  } | null;
+  proxyStaticSaving: boolean;
 }
 
 interface NestedSchemaNode {
@@ -73,7 +86,6 @@ const ApiTabContent: React.FC<ApiTabContentProps> = ({
   setResponseSchema,
   responseMode,
   setResponseMode,
-  proxyUrl,
   mockStaticBody,
   setMockStaticBody,
   mockScript,
@@ -83,6 +95,12 @@ const ApiTabContent: React.FC<ApiTabContentProps> = ({
   addQueryParamField,
   addBodyField,
   addResponseField,
+  onPersistStaticMockFromProxy,
+  proxyResponseStatus,
+  proxyResponseStatusText,
+  proxyResponseBody,
+  proxyResponseFeedback,
+  proxyStaticSaving,
 }) => {
   const matchesSection = (
     row: ApiSchemaRow,
@@ -581,6 +599,11 @@ const ApiTabContent: React.FC<ApiTabContentProps> = ({
                       <th className="px-3 py-1.5 text-center font-bold text-slate-500 w-20">
                         {t('schemaRequired')}
                       </th>
+                      {responseMode === 'proxy' && (
+                        <th className="px-3 py-1.5 text-left font-bold text-slate-500 w-40">
+                          {t('headersValue')}
+                        </th>
+                      )}
                       <th className="px-3 py-1.5 text-left font-bold text-slate-500">
                         {t('schemaDescription')}
                       </th>
@@ -609,12 +632,15 @@ const ApiTabContent: React.FC<ApiTabContentProps> = ({
                               type: 'string',
                               required: false,
                               desc: '',
+                              value: '',
                               depth: parentDepth + 1,
                               section: 'query',
                             });
                             setRequestParams(list);
                           }}
                           descriptionPlaceholder={t('schemaDescription')}
+                          showValueInput={responseMode === 'proxy'}
+                          valuePlaceholder={t('headersValue')}
                         />
                       ) : null,
                     )}
@@ -716,6 +742,11 @@ const ApiTabContent: React.FC<ApiTabContentProps> = ({
                       <th className="px-3 py-1.5 text-center font-bold text-slate-500 w-20">
                         {t('schemaRequired')}
                       </th>
+                      {responseMode === 'proxy' && (
+                        <th className="px-3 py-1.5 text-left font-bold text-slate-500 w-40">
+                          {t('headersValue')}
+                        </th>
+                      )}
                       <th className="px-3 py-1.5 text-left font-bold text-slate-500">
                         {t('schemaDescription')}
                       </th>
@@ -744,12 +775,15 @@ const ApiTabContent: React.FC<ApiTabContentProps> = ({
                               type: 'string',
                               required: false,
                               desc: '',
+                              value: '',
                               depth: parentDepth + 1,
                               section: 'body',
                             });
                             setRequestParams(list);
                           }}
                           descriptionPlaceholder={t('schemaDescription')}
+                          showValueInput={responseMode === 'proxy'}
+                          valuePlaceholder={t('headersValue')}
                         />
                       ) : null,
                     )}
@@ -1106,26 +1140,73 @@ const ApiTabContent: React.FC<ApiTabContentProps> = ({
           </div>
 
           {responseMode === 'proxy' ? (
-            <div className="flex flex-col items-center justify-center py-10 bg-slate-50/50 rounded-3xl border-2 border-dashed border-slate-200">
-              <div className="p-3 bg-blue-100 text-blue-600 rounded-2xl mb-3">
-                <Server size={28} />
+            <div className="space-y-3">
+              <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[10px] text-amber-700">
+                {t('mockProxyUseTabsHint')}
               </div>
-              <h4 className="text-base font-bold text-slate-900">{t('mockProxyTitle')}</h4>
-              <p className="text-xs text-slate-500 max-w-sm text-center mt-1.5">
-                {t('mockProxyDesc')}{' '}
-                <span className="font-mono text-blue-600 font-bold">{proxyUrl}</span>.
-              </p>
-              <div className="flex gap-3 mt-4">
-                <button
-                  onClick={() => setResponseMode('static')}
-                  className="px-5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
+
+              {proxyResponseFeedback && (
+                <div
+                  className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[10px] ${getJsonStatusClasses(
+                    proxyResponseFeedback.type,
+                  )}`}
                 >
-                  {t('mockProxySwitchToMock')}
-                </button>
-                <button className="flex items-center gap-2 px-5 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/20">
-                  <Zap size={14} />
-                  {t('mockProxyRun')}
-                </button>
+                  {proxyResponseFeedback.type === 'error' ? (
+                    <AlertCircle size={12} />
+                  ) : (
+                    <CheckCircle2 size={12} />
+                  )}
+                  <span>{proxyResponseFeedback.message}</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                  {t('mockProxyResponseStatus')}
+                </div>
+                <div className="font-mono text-xs text-slate-700">
+                  {proxyResponseStatus !== null
+                    ? `${proxyResponseStatus} ${proxyResponseStatusText}`.trim()
+                    : '--'}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    {t('mockProxyResponseData')}
+                  </h5>
+                  <button
+                    type="button"
+                    disabled={!proxyResponseBody || proxyStaticSaving}
+                    onClick={() =>
+                      void onPersistStaticMockFromProxy({
+                        mockStaticBody: proxyResponseBody,
+                        responseHeaders,
+                        responseSchema,
+                        responseMode: 'static',
+                      })
+                    }
+                    className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-[10px] font-bold text-blue-600 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      {proxyStaticSaving && <LoaderCircle size={12} className="animate-spin" />}
+                      {t('mockProxySaveStatic')}
+                    </span>
+                  </button>
+                </div>
+                {proxyResponseBody ? (
+                  <JsonCodeEditor
+                    value={proxyResponseBody}
+                    onChange={() => {}}
+                    minHeightClassName="min-h-[320px]"
+                    readOnly
+                  />
+                ) : (
+                  <div className="flex min-h-[240px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-xs text-slate-400">
+                    {t('mockProxyNoResponse')}
+                  </div>
+                )}
               </div>
             </div>
           ) : responseMode === 'static' ? (
@@ -1143,11 +1224,10 @@ const ApiTabContent: React.FC<ApiTabContentProps> = ({
                   </button>
                 </div>
               </div>
-              <textarea
-                spellCheck={false}
-                className="w-full h-80 bg-slate-900 rounded-2xl p-4 text-emerald-300 font-mono text-[11px] overflow-auto leading-relaxed border border-slate-800 shadow-inner focus:outline-none"
+              <JsonCodeEditor
                 value={mockStaticBody}
-                onChange={(e) => setMockStaticBody(e.target.value)}
+                onChange={setMockStaticBody}
+                minHeightClassName="min-h-[320px]"
               />
             </div>
           ) : (

@@ -20,6 +20,7 @@ import { ApisService } from './apis.service';
 import { CreateApiDto } from './dto/create-api.dto';
 import { UpdateApiDto } from './dto/update-api.dto';
 import { ApiDetailDto, ApiListItemDto } from './dto/api-response.dto';
+import { ApiProxyRequestDto, ApiProxyResponseDto } from './dto/proxy-request.dto';
 import { SimpleSuccessResponseDto } from '../auth/dto/auth-response.dto';
 import { ApiResponseEnvelope } from '../common/api-response';
 
@@ -29,6 +30,7 @@ import { ApiResponseEnvelope } from '../common/api-response';
   ApiResponseEnvelope,
   ApiListItemDto,
   ApiDetailDto,
+  ApiProxyResponseDto,
   SimpleSuccessResponseDto,
 )
 @Controller('projects/:projectId/apis')
@@ -153,6 +155,36 @@ export class ApisController {
   ) {
     const userId = req.userId as string;
     return this.apisService.update(userId, projectId, apiId, dto);
+  }
+
+  @Post(':apiId/proxy-request')
+  @ApiOperation({
+    summary: '发起真实代理请求',
+    description:
+      '由服务端向目标地址发起真实 HTTP 请求，返回状态码、响应头和响应体文本，供前端调试并提取静态 Mock。',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '真实代理请求完成。',
+    schema: {
+      allOf: [
+        { $ref: getSchemaPath(ApiResponseEnvelope) },
+        {
+          properties: {
+            data: { $ref: getSchemaPath(ApiProxyResponseDto) },
+          },
+        },
+      ],
+    },
+  })
+  async proxyRequest(
+    @Req() req: { userId?: string },
+    @Param('projectId') projectId: string,
+    @Param('apiId') apiId: string,
+    @Body() dto: ApiProxyRequestDto,
+  ) {
+    const userId = req.userId as string;
+    return this.apisService.proxyRequest(userId, projectId, apiId, dto);
   }
 
   @Delete(':apiId')

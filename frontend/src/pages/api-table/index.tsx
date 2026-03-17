@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Search, Plus, MoreVertical, Code2, ChevronRight, ChevronDown, Globe, Clock, Settings2, Trash2,
-  Save, X, ShieldCheck, Zap, Database, ListFilter, Braces, FileJson, Folder, FolderTree, List
+  Save, X, ShieldCheck, Zap, Database, ListFilter, Braces, FileJson, Folder, FolderTree, List, LoaderCircle
 } from 'lucide-react';
 import type { ApiItem, ApiHeaderRow, ApiSchemaRow, ApiMockMode } from '../../types';
 import { useLanguage } from '../../context/LanguageContext';
@@ -38,6 +38,15 @@ const ApiTable: React.FC = () => {
   const [responseSchema, setResponseSchema] = useState<ApiSchemaRow[]>([]);
   const [mockStaticBody, setMockStaticBody] = useState<string>('');
   const [mockScript, setMockScript] = useState<string>('');
+  const [proxyRequestLoading, setProxyRequestLoading] = useState(false);
+  const [proxyResponseStatus, setProxyResponseStatus] = useState<number | null>(null);
+  const [proxyResponseStatusText, setProxyResponseStatusText] = useState('');
+  const [proxyResponseBody, setProxyResponseBody] = useState('');
+  const [proxyResponseFeedback, setProxyResponseFeedback] = useState<{
+    type: 'info' | 'success' | 'error';
+    message: string;
+  } | null>(null);
+  const [proxyStaticSaving, setProxyStaticSaving] = useState(false);
 
   const fetchApis = useCallback(async () => {
     if (!projectId) {
@@ -139,6 +148,10 @@ export default function(req, res) {
   });
 }`,
         );
+        setProxyResponseStatus(null);
+        setProxyResponseStatusText('');
+        setProxyResponseBody('');
+        setProxyResponseFeedback(null);
       } finally {
         setDetailLoading(false);
       }
@@ -148,7 +161,7 @@ export default function(req, res) {
   }, [projectId, selectedApi?.id]);
 
   const handleSave = async () => {
-    if (!selectedApi || !projectId) return;
+    if (!selectedApi || !projectId || saving) return;
     setSaving(true);
     try {
       await request(`/api/projects/${projectId}/apis/${selectedApi.id}`, {
@@ -174,6 +187,51 @@ export default function(req, res) {
       await fetchApis();
     } finally {
       setSaving(false);
+    }
+  };
+
+  const persistProxyResponseAsStatic = async (payload: {
+    mockStaticBody: string;
+    responseHeaders: ApiHeaderRow[];
+    responseSchema: ApiSchemaRow[];
+    responseMode: 'static';
+  }) => {
+    if (!selectedApi || !projectId || proxyStaticSaving) return;
+
+    setProxyStaticSaving(true);
+    setResponseHeaders(payload.responseHeaders);
+    setResponseSchema(payload.responseSchema);
+    setMockStaticBody(payload.mockStaticBody);
+    setResponseMode(payload.responseMode);
+
+    try {
+      await request(`/api/projects/${projectId}/apis/${selectedApi.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: editName,
+          path: editPath || '/',
+          method: editMethod,
+          status: editStatus,
+          requestHeaders,
+          requestParams,
+          responseHeaders: payload.responseHeaders,
+          responseSchema: payload.responseSchema,
+          mockStaticBody: payload.mockStaticBody,
+          mockScript,
+          mockMode: payload.responseMode,
+          mockProxyUrl: proxyUrl,
+        }),
+      });
+      await fetchApis();
+      setProxyResponseFeedback({
+        type: 'success',
+        message: t('mockProxySaveSuccess'),
+      });
+    } finally {
+      setProxyStaticSaving(false);
     }
   };
 
@@ -239,6 +297,7 @@ export default function(req, res) {
         type: 'string',
         required: false,
         desc: '',
+        value: '',
         section: 'query',
       },
     ]);
@@ -252,6 +311,7 @@ export default function(req, res) {
         type: 'string',
         required: false,
         desc: '',
+        value: '',
         section: 'body',
       },
     ]);
@@ -268,6 +328,274 @@ export default function(req, res) {
         section: 'response',
       },
     ]);
+  };
+
+  const parseSchemaValue = (row: ApiSchemaRow) => {
+    const rawValue = row.value ?? '';
+
+    if (row.type === 'boolean') {
+      return rawValue === 'true';
+    }
+
+    if (row.type === 'integer') {
+      return rawValue === '' ? 0 : parseInt(rawValue, 10) || 0;
+    }
+
+    if (row.type === 'number') {
+      return rawValue === '' ? 0 : Number(rawValue) || 0;
+    }
+
+    return rawValue;
+  };
+
+  const buildSectionRequestPayload = (
+    section: NonNullable<ApiSchemaRow['section']>,
+  ) => {
+    const rows = requestParams.filter((row) => row.section === section);
+
+    const buildNode = (
+      list: ApiSchemaRow[],
+      startIndex: number,
+    ): { value: unknown; nextIndex: number } => {
+      const current = list[startIndex];
+      const currentDepth = current.depth ?? 0;
+
+      if (current.type === 'object') {
+        const result: Record<string, unknown> = {};
+        let index = startIndex + 1;
+
+        while (index < list.length && (list[index].depth ?? 0) > currentDepth) {
+          if ((list[index].depth ?? 0) !== currentDepth + 1) {
+            index += 1;
+            continue;
+          }
+          const child = buildNode(list, index);
+          result[list[index].name] = child.value;
+          index = child.nextIndex;
+        }
+
+        return { value: result, nextIndex: index };
+      }
+
+      if (current.type === 'array') {
+        const result: unknown[] = [];
+        let index = startIndex + 1;
+
+        while (index < list.length && (list[index].depth ?? 0) > currentDepth) {
+          if ((list[index].depth ?? 0) !== currentDepth + 1) {
+            index += 1;
+            continue;
+          }
+          const child = buildNode(list, index);
+          result.push(child.value);
+          index = child.nextIndex;
+        }
+
+        return { value: result, nextIndex: index };
+      }
+
+      return { value: parseSchemaValue(current), nextIndex: startIndex + 1 };
+    };
+
+    const payload: Record<string, unknown> = {};
+    let index = 0;
+
+    while (index < rows.length) {
+      const current = rows[index];
+      if ((current.depth ?? 0) !== 0) {
+        index += 1;
+        continue;
+      }
+      const built = buildNode(rows, index);
+      payload[current.name] = built.value;
+      index = built.nextIndex;
+    }
+
+    return payload;
+  };
+
+  const inferScalarType = (value: unknown): ApiSchemaRow['type'] => {
+    if (typeof value === 'number') {
+      return Number.isInteger(value) ? 'integer' : 'number';
+    }
+    if (typeof value === 'boolean') {
+      return 'boolean';
+    }
+    return 'string';
+  };
+
+  const inferRowsFromValue = (
+    name: string,
+    value: unknown,
+    depth: number,
+    section: 'response',
+  ): ApiSchemaRow[] => {
+    if (Array.isArray(value)) {
+      const rows: ApiSchemaRow[] = [
+        {
+          name,
+          type: 'array',
+          required: false,
+          desc: '',
+          depth,
+          section,
+        },
+      ];
+
+      if (value.length > 0) {
+        rows.push(...inferRowsFromValue('item', value[0], depth + 1, section));
+      }
+
+      return rows;
+    }
+
+    if (value && typeof value === 'object') {
+      const rows: ApiSchemaRow[] = [
+        {
+          name,
+          type: 'object',
+          required: false,
+          desc: '',
+          depth,
+          section,
+        },
+      ];
+
+      Object.entries(value as Record<string, unknown>).forEach(([childName, childValue]) => {
+        rows.push(...inferRowsFromValue(childName, childValue, depth + 1, section));
+      });
+
+      return rows;
+    }
+
+    return [
+      {
+        name,
+        type: inferScalarType(value),
+        required: false,
+        desc: '',
+        depth,
+        section,
+      },
+    ];
+  };
+
+  const inferResponseSchema = (value: unknown): ApiSchemaRow[] => {
+    if (Array.isArray(value)) {
+      return inferRowsFromValue('items', value, 0, 'response');
+    }
+
+    if (value && typeof value === 'object') {
+      const rows: ApiSchemaRow[] = [];
+      Object.entries(value as Record<string, unknown>).forEach(([name, childValue]) => {
+        rows.push(...inferRowsFromValue(name, childValue, 0, 'response'));
+      });
+      return rows;
+    }
+
+    return inferRowsFromValue('value', value, 0, 'response');
+  };
+
+  const handleSendProxyRequest = async () => {
+    if (!selectedApi || !projectId || responseMode !== 'proxy' || proxyRequestLoading) return;
+
+    setProxyRequestLoading(true);
+    setProxyResponseFeedback(null);
+
+    try {
+      const targetUrl = (() => {
+        try {
+          return new URL(editPath || '/', proxyUrl).toString();
+        } catch {
+          return `${proxyUrl.replace(/\/$/, '')}/${(editPath || '/').replace(/^\//, '')}`;
+        }
+      })();
+      const queryPayload = Object.fromEntries(
+        Object.entries(buildSectionRequestPayload('query')).map(([key, value]) => [
+          key,
+          typeof value === 'string' ? value : JSON.stringify(value),
+        ]),
+      );
+      const bodyPayload = buildSectionRequestPayload('body');
+      const headers = Object.fromEntries(
+        requestHeaders
+          .filter((row) => row.key.trim())
+          .map((row) => [row.key.trim(), row.value]),
+      );
+
+      if (
+        Object.keys(bodyPayload).length > 0 &&
+        !headers['Content-Type'] &&
+        !headers['content-type']
+      ) {
+        headers['Content-Type'] = 'application/json';
+      }
+
+      const proxyResponse = await request<{
+        status: number;
+        statusText: string;
+        headers: Array<{ key: string; value: string }>;
+        body: string;
+        contentType?: string | null;
+      }>(`/api/projects/${projectId}/apis/${selectedApi.id}/proxy-request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: targetUrl,
+          method: editMethod,
+          headers,
+          query: queryPayload,
+          body:
+            !['GET', 'HEAD'].includes(editMethod) && Object.keys(bodyPayload).length > 0
+              ? JSON.stringify(bodyPayload)
+              : undefined,
+        }),
+      });
+
+      const nextResponseHeaders = proxyResponse.headers.map((item) => ({
+        key: item.key,
+        value: item.value,
+        desc: '',
+      }));
+
+      setProxyResponseStatus(proxyResponse.status);
+      setProxyResponseStatusText(proxyResponse.statusText);
+      setResponseHeaders(nextResponseHeaders);
+
+      let nextResponseBody = proxyResponse.body;
+      let nextResponseSchema: ApiSchemaRow[] = [];
+      if (
+        (proxyResponse.contentType || '').includes('application/json') ||
+        /^[\[{]/.test(proxyResponse.body.trim())
+      ) {
+        try {
+          const parsed = JSON.parse(proxyResponse.body);
+          nextResponseBody = JSON.stringify(parsed, null, 2);
+          nextResponseSchema = inferResponseSchema(parsed);
+        } catch {
+          nextResponseBody = proxyResponse.body;
+        }
+      }
+
+      setProxyResponseBody(nextResponseBody);
+      setResponseSchema(nextResponseSchema);
+      setProxyResponseFeedback({
+        type: 'success',
+        message: t('mockProxyApplySchema'),
+      });
+    } catch (error) {
+      setProxyResponseFeedback({
+        type: 'error',
+        message:
+          error instanceof Error && error.message
+            ? `${t('mockProxyRequestError')} ${error.message}`
+            : t('mockProxyRequestError'),
+      });
+    } finally {
+      setProxyRequestLoading(false);
+    }
   };
 
   interface ApiTreeNode {
@@ -539,7 +867,7 @@ export default function(req, res) {
                   disabled={saving}
                   className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/10 disabled:opacity-60 cursor-pointer"
                 >
-                  <Save size={14} />
+                  {saving ? <LoaderCircle size={14} className="animate-spin" /> : <Save size={14} />}
                   {saving ? (t('apisLoading') as string) : t('interfaceSaveChanges')}
                 </button>
               </div>
@@ -559,6 +887,8 @@ export default function(req, res) {
                 proxyUrl={proxyUrl}
                 setProxyUrl={setProxyUrl}
                 proxyOptions={proxyOptions}
+                onSendProxyRequest={handleSendProxyRequest}
+                proxyRequestLoading={proxyRequestLoading}
               />
 
               <div className="h-px bg-slate-100" />
@@ -594,7 +924,6 @@ export default function(req, res) {
                   setResponseSchema={setResponseSchema}
                   responseMode={responseMode}
                   setResponseMode={setResponseMode}
-                  proxyUrl={proxyUrl}
                   mockStaticBody={mockStaticBody}
                   setMockStaticBody={setMockStaticBody}
                   mockScript={mockScript}
@@ -604,6 +933,12 @@ export default function(req, res) {
                   addQueryParamField={addQueryParamField}
                   addBodyField={addBodyField}
                   addResponseField={addResponseField}
+                  onPersistStaticMockFromProxy={persistProxyResponseAsStatic}
+                  proxyResponseStatus={proxyResponseStatus}
+                  proxyResponseStatusText={proxyResponseStatusText}
+                  proxyResponseBody={proxyResponseBody}
+                  proxyResponseFeedback={proxyResponseFeedback}
+                  proxyStaticSaving={proxyStaticSaving}
                 />
               </div>
             </div>
