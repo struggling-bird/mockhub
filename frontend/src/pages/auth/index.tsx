@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, Lock, User, Building, Zap, ArrowRight } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
-import { request, ApiError } from '../utils/http';
+import { useLanguage } from '../../context/LanguageContext';
+import { request, ApiError } from '../../utils/http';
 
 interface AuthProps {
   onLogin: () => void;
@@ -56,15 +56,15 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="absolute top-8 right-8 flex gap-2">
-        <button 
+        <button
           onClick={() => setLanguage('en')}
-          className={`px-3 py-1 rounded text-xs font-bold transition-colors ${language === 'en' ? 'bg-slate-900 text-white' : 'bg-white text-slate-400 border border-slate-200'}`}
+          className={`px-3 py-1 rounded text-xs font-bold transition-colors cursor-pointer ${language === 'en' ? 'bg-slate-900 text-white' : 'bg-white text-slate-400 border border-slate-200'}`}
         >
           EN
         </button>
-        <button 
+        <button
           onClick={() => setLanguage('zh')}
-          className={`px-3 py-1 rounded text-xs font-bold transition-colors ${language === 'zh' ? 'bg-slate-900 text-white' : 'bg-white text-slate-400 border border-slate-200'}`}
+          className={`px-3 py-1 rounded text-xs font-bold transition-colors cursor-pointer ${language === 'zh' ? 'bg-slate-900 text-white' : 'bg-white text-slate-400 border border-slate-200'}`}
         >
           中文
         </button>
@@ -87,8 +87,8 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                   <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5 ml-1">{t('username')}</label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
                       className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
@@ -100,8 +100,8 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                   <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5 ml-1">{t('company')}</label>
                   <div className="relative">
                     <Building className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={company}
                       onChange={(e) => setCompany(e.target.value)}
                       className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
@@ -116,8 +116,8 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
               <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5 ml-1">{t('email')}</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input 
-                  type="email" 
+                <input
+                  type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
@@ -130,8 +130,8 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
               <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5 ml-1">{t('password')}</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input 
-                  type="password" 
+                <input
+                  type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
@@ -140,10 +140,10 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
               </div>
             </div>
 
-            <button 
+            <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 group"
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 group cursor-pointer"
             >
               {loading ? (isLogin ? '登录中...' : '注册中...') : isLogin ? t('login') : t('register')}
               <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
@@ -158,9 +158,10 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
             )}
             <p className="text-sm text-slate-500">
               {isLogin ? t('noAccount') : t('hasAccount')}{' '}
-              <button 
+              <button
+                type="button"
                 onClick={() => setIsLogin(!isLogin)}
-                className="text-blue-600 font-bold hover:underline"
+                className="text-blue-600 font-bold hover:underline cursor-pointer"
               >
                 {isLogin ? t('register') : t('login')}
               </button>

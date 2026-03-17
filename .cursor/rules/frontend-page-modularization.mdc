@@ -1,0 +1,42 @@
+---
+description: 约束前端 pages 按模块拆分与目录约定，避免单文件过大
+globs: frontend/src/pages/**/*.tsx
+alwaysApply: false
+---
+
+# Frontend Pages Modularization
+
+## 目录与入口约定
+
+- **主入口使用 index**：每个功能模块对应一个目录，该模块的「主入口页面」放在该目录下并命名为 `index.tsx`，路由通过引用目录路径即可解析到默认导出（如 `import ApiTable from './pages/api-table'`）。
+- **同模块多页面同目录**：同一业务模块的列表页、详情页、新建/编辑表单页等不同页面，应集中在同一模块目录下，便于维护。例如项目模块：`pages/project/index.tsx`（列表）、`pages/project/Form.tsx`（新建/编辑）；路由引用 `./pages/project` 与 `./pages/project/Form`。
+
+## 拆分与实现
+
+- 页面文件只负责路由入口、状态编排、数据请求和子模块组合，不要在单个 page 中长期堆积大段 JSX。
+- 同一页面同时出现「数据加载 + 大型表单 + 表格行组件 + 弹层/菜单 + 工具函数」时，必须拆分为页面容器和局部模块。
+- 优先使用该模块目录内组织子组件，例如 `pages/api-table/ApiTabContent.tsx`、`pages/api-table/SchemaRow.tsx`；模块内引用使用相对路径 `./ApiTabContent`。
+- 可复用逻辑优先抽为 hooks 或公共组件；仅被当前模块使用的组件，保留在模块目录内，避免污染全局 `components`。
+- 内联定义的 React 子组件如果承载表单输入、列表行、复杂交互，必须抽离到组件外部，避免父组件重渲染时发生重挂载、焦点丢失或局部状态重置。
+- 页面文件超过约 300 行，或出现多个独立视觉区块时，应主动评估拆分，而不是继续追加逻辑。
+- 新增拆分时要同步删除原页面中已无用的状态、工具函数和导入，避免“已抽离 UI + 旧实现残留”并存。
+- 页面中的文案必须继续走国际化，不因拆分而回退为硬编码。
+
+```tsx
+// 推荐：按模块目录引用，主入口为 index
+import Dashboard from './pages/dashboard';
+import ApiTable from './pages/api-table';
+import ProjectListPage from './pages/project';
+import ProjectFormPage from './pages/project/Form';
+```
+
+```tsx
+// 推荐：模块内页面容器仅做编排，子组件同目录
+import ApiBasicInfoSection from './ApiBasicInfoSection';
+import ApiTabContent from './ApiTabContent';
+```
+
+```tsx
+// 不推荐：在 page 内定义可编辑行组件
+const SchemaRow = () => { /* ... */ };
+```

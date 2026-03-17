@@ -1,6 +1,6 @@
 import React from 'react';
 import { Globe, ShieldCheck, Zap, Plus, Settings2 } from 'lucide-react';
-import { MOCK_PROXY_GROUPS } from '../types';
+import { MOCK_PROXY_GROUPS } from '../../types';
 
 const ProxyConfig: React.FC = () => {
   return (
@@ -10,7 +10,7 @@ const ProxyConfig: React.FC = () => {
           <h2 className="text-lg font-semibold text-slate-900">Proxy Groups</h2>
           <p className="text-sm text-slate-500">Manage regex-based routing and automatic mock generation.</p>
         </div>
-        <button className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors">
+        <button type="button" className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors cursor-pointer">
           <Plus size={16} />
           Add Group
         </button>
@@ -31,7 +31,7 @@ const ProxyConfig: React.FC = () => {
                 }`}>
                   {group.mode}
                 </span>
-                <button className="text-slate-400 hover:text-slate-600">
+                <button type="button" className="text-slate-400 hover:text-slate-600 cursor-pointer">
                   <Settings2 size={16} />
                 </button>
               </div>
@@ -62,10 +62,10 @@ const ProxyConfig: React.FC = () => {
           <p className="text-blue-100 text-sm opacity-90">Your project proxy is active at: <span className="mono font-bold">https://proxy.mockdev.io/p-8821</span></p>
         </div>
         <div className="flex gap-3 relative z-10">
-          <button className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm font-medium transition-colors backdrop-blur-sm">
+          <button type="button" className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm font-medium transition-colors backdrop-blur-sm cursor-pointer">
             Copy URL
           </button>
-          <button className="bg-white text-blue-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-50 transition-colors">
+          <button type="button" className="bg-white text-blue-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-50 transition-colors cursor-pointer">
             Restart Server
           </button>
         </div>

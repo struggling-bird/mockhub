@@ -16,7 +16,7 @@ const TeamManagement: React.FC = () => {
           <h2 className="text-base font-semibold text-slate-900">Team Members</h2>
           <p className="text-xs text-slate-500">Manage access and permissions for your project collaborators.</p>
         </div>
-        <button className="flex items-center gap-2 bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-slate-800 transition-colors">
+        <button type="button" className="flex items-center gap-2 bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-slate-800 transition-colors cursor-pointer">
           <Plus size={14} />
           Invite Member
         </button>
@@ -26,9 +26,9 @@ const TeamManagement: React.FC = () => {
         <div className="p-3 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
           <div className="relative w-64">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
-            <input 
-              type="text" 
-              placeholder="Filter members..." 
+            <input
+              type="text"
+              placeholder="Filter members..."
               className="w-full pl-8 pr-3 py-1 bg-white border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             />
           </div>
@@ -64,7 +64,7 @@ const TeamManagement: React.FC = () => {
                     {member.status}
                   </span>
                 </div>
-                <button className="text-slate-400 hover:text-slate-600">
+                <button type="button" className="text-slate-400 hover:text-slate-600 cursor-pointer">
                   <MoreVertical size={14} />
                 </button>
               </div>

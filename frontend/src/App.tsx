@@ -6,14 +6,14 @@
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
-import Dashboard from './pages/Dashboard';
-import ApiTable from './pages/ApiTable';
-import ProxyConfig from './pages/ProxyConfig';
-import PublicAssets from './pages/PublicAssets';
-import TeamManagement from './pages/TeamManagement';
-import ProjectManagement from './pages/ProjectManagement';
-import ProjectForm from './pages/ProjectForm';
-import Auth from './pages/Auth';
+import Dashboard from './pages/dashboard';
+import ApiTable from './pages/api-table';
+import ProxyConfig from './pages/proxy';
+import PublicAssets from './pages/assets';
+import TeamManagement from './pages/team';
+import ProjectListPage from './pages/project';
+import ProjectFormPage from './pages/project/Form';
+import Auth from './pages/auth';
 import { Bell, ChevronDown } from 'lucide-react';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { request, ApiError } from './utils/http';
@@ -191,9 +191,9 @@ function AppContent() {
           <div className="max-w-7xl mx-auto">
             <Routes>
               <Route path="/" element={<Dashboard />} />
-              <Route path="/projects" element={<ProjectManagement />} />
-              <Route path="/projects/new" element={<ProjectForm />} />
-              <Route path="/projects/edit/:id" element={<ProjectForm />} />
+              <Route path="/projects" element={<ProjectListPage />} />
+              <Route path="/projects/new" element={<ProjectFormPage />} />
+              <Route path="/projects/edit/:id" element={<ProjectFormPage />} />
               <Route path="/interfaces" element={<ApiTable />} />
               <Route path="/proxies" element={<ProxyConfig />} />
               <Route path="/assets" element={<PublicAssets />} />

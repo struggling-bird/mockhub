@@ -95,6 +95,7 @@ export const translations: Translations = {
     en: 'Upload a custom logo for your project. Recommended size: 256x256px.',
     zh: '为项目上传自定义 Logo，推荐尺寸：256x256 像素。',
   },
+  projectLogoUploading: { en: 'Uploading logo...', zh: 'Logo 上传中…' },
   projectLogoPlaceholder: {
     en: 'Or paste a logo URL here...',
     zh: '或在此粘贴 Logo 的 URL...',
@@ -119,6 +120,8 @@ export const translations: Translations = {
   cancel: { en: 'Cancel', zh: '取消' },
   saveCreateProject: { en: 'Create Project', zh: '创建项目' },
   saveUpdateProject: { en: 'Update Project', zh: '更新项目' },
+  projectSaveError: { en: 'Network error, failed to save project', zh: '网络异常，无法保存项目' },
+  projectLogoUploadError: { en: 'Network error, logo upload failed', zh: '网络异常，Logo 上传失败' },
 
   // Public Assets
   publicAssetsTitle: { en: 'Public Assets', zh: '公共资产' },
@@ -262,6 +265,24 @@ export const translations: Translations = {
     zh: '管理开发环境及团队访问权限。',
   },
   projectsEnter: { en: 'Enter', zh: '进入' },
+  projectsLoading: { en: 'Loading projects...', zh: '项目加载中...' },
+  projectsLoadError: { en: 'Failed to load project list', zh: '加载项目列表失败' },
+  projectsNetworkError: {
+    en: 'Network error, unable to load project list',
+    zh: '网络异常，无法加载项目列表',
+  },
+  projectNoDescription: { en: 'No description', zh: '暂无描述' },
+  projectStatusActive: { en: 'Active', zh: '活跃' },
+  projectCurrentUser: { en: 'You', zh: '你' },
+  projectRename: { en: 'Rename', zh: '重命名' },
+  projectRenamePrompt: { en: 'Rename project', zh: '重命名项目' },
+  projectRenameFailed: { en: 'Network error, rename failed', zh: '网络异常，重命名失败' },
+  projectDelete: { en: 'Delete', zh: '删除' },
+  projectDeleteConfirm: {
+    en: 'Are you sure you want to delete this project?',
+    zh: '确定要删除该项目吗？',
+  },
+  projectDeleteFailed: { en: 'Network error, delete failed', zh: '网络异常，删除失败' },
 
   // Mock editor
   mockEditorTitle: { en: 'Edit Mock Data', zh: '编辑 Mock 数据' },

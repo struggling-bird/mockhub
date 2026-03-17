@@ -1,15 +1,15 @@
 import React from 'react';
-import { 
-  Activity, 
-  Users, 
-  Code2, 
-  Globe, 
-  ArrowUpRight, 
+import {
+  Activity,
+  Users,
+  Code2,
+  Globe,
+  ArrowUpRight,
   Clock,
   CheckCircle2,
   AlertCircle
 } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 const Dashboard: React.FC = () => {
   const { t } = useLanguage();
@@ -44,7 +44,7 @@ const Dashboard: React.FC = () => {
         <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
           <div className="p-3 border-b border-slate-200 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-slate-900">{t('recentActivity')}</h3>
-            <button className="text-[10px] text-blue-600 font-medium hover:underline">
+            <button type="button" className="text-[10px] text-blue-600 font-medium hover:underline cursor-pointer">
               {t('viewAll')}
             </button>
           </div>
@@ -102,7 +102,7 @@ const Dashboard: React.FC = () => {
               {t('teamTipDesc').replace('Script Mode', '')}
               <span className="text-blue-400 mono"> {t('scriptMode')} </span>
             </p>
-            <button className="w-full py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-[11px] font-bold transition-colors">
+            <button type="button" className="w-full py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-[11px] font-bold transition-colors cursor-pointer">
               {t('teamTipCta')}
             </button>
           </div>

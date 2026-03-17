@@ -1,6 +1,6 @@
 import React from 'react';
 import { Database, Plus, Search, ExternalLink, Copy, Tag } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 const PublicAssets: React.FC = () => {
   const { t } = useLanguage();
@@ -39,7 +39,7 @@ const PublicAssets: React.FC = () => {
           <h2 className="text-lg font-semibold text-slate-900">{t('publicAssetsTitle')}</h2>
           <p className="text-sm text-slate-500">{t('publicAssetsDesc')}</p>
         </div>
-        <button className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+        <button type="button" className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors cursor-pointer">
           <Plus size={16} />
           {t('publicAssetsAdd')}
         </button>
@@ -55,7 +55,7 @@ const PublicAssets: React.FC = () => {
                 </div>
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{asset.category}</span>
               </div>
-              <button className="text-slate-400 hover:text-blue-600 transition-colors">
+              <button type="button" className="text-slate-400 hover:text-blue-600 transition-colors cursor-pointer">
                 <Copy size={16} />
               </button>
             </div>
