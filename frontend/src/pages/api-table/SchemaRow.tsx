@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronDown, Trash2 } from 'lucide-react';
+import { ChevronDown, Trash2, Plus } from 'lucide-react';
 import type { ApiSchemaRow } from '../../types';
 import SelectableInput from '../../components/SelectableInput';
 
@@ -8,6 +8,7 @@ interface SchemaRowProps {
   onChange: (row: ApiSchemaRow) => void;
   onDelete?: () => void;
   descriptionPlaceholder: string;
+  onAddChild?: () => void;
 }
 
 const SchemaRow: React.FC<SchemaRowProps> = ({
@@ -15,6 +16,7 @@ const SchemaRow: React.FC<SchemaRowProps> = ({
   onChange,
   onDelete,
   descriptionPlaceholder,
+  onAddChild,
 }) => (
   <tr className="hover:bg-slate-50/50 group">
     <td className="px-3 py-1.5">
@@ -61,13 +63,25 @@ const SchemaRow: React.FC<SchemaRowProps> = ({
       />
     </td>
     <td className="px-3 py-1.5">
-      <input
-        type="text"
-        value={row.desc || ''}
-        onChange={(e) => onChange({ ...row, desc: e.target.value })}
-        placeholder={descriptionPlaceholder}
-        className="w-full bg-transparent outline-none text-slate-400 italic text-xs"
-      />
+      <div className="flex items-center gap-1.5">
+        <input
+          type="text"
+          value={row.desc || ''}
+          onChange={(e) => onChange({ ...row, desc: e.target.value })}
+          placeholder={descriptionPlaceholder}
+          className="w-full bg-transparent outline-none text-slate-400 italic text-xs"
+        />
+        {(row.type === 'object' || row.type === 'array') && onAddChild && (
+          <button
+            type="button"
+            onClick={() => onAddChild()}
+            className="p-1 text-slate-300 hover:text-blue-600 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
+            title="添加子字段"
+          >
+            <Plus size={10} />
+          </button>
+        )}
+      </div>
     </td>
     <td className="px-3 py-1.5 text-right opacity-0 group-hover:opacity-100 transition-opacity">
       <button

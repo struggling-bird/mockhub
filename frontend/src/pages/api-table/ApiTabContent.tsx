@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   AlertCircle,
   Braces,
+  CheckCircle2,
   Copy,
   FileJson,
   Plus,
@@ -11,6 +12,7 @@ import {
   Zap,
 } from 'lucide-react';
 import type { ApiHeaderRow, ApiMockMode, ApiSchemaRow } from '../../types';
+import JsonCodeEditor from './JsonCodeEditor';
 import SchemaRow from './SchemaRow';
 
 interface ApiTabContentProps {
@@ -38,6 +40,26 @@ interface ApiTabContentProps {
   addResponseField: () => void;
 }
 
+interface NestedSchemaNode {
+  type: ApiSchemaRow['type'];
+  description?: string;
+  required?: boolean;
+  properties?: Record<string, NestedSchemaNode>;
+  items?: NestedSchemaNode;
+}
+
+interface NamedNestedSchemaNode {
+  name: string;
+  node: NestedSchemaNode;
+}
+
+type JsonStatusType = 'info' | 'success' | 'error';
+
+interface JsonStatusState {
+  type: JsonStatusType;
+  message: string;
+}
+
 const ApiTabContent: React.FC<ApiTabContentProps> = ({
   activeTab,
   t,
@@ -62,6 +84,434 @@ const ApiTabContent: React.FC<ApiTabContentProps> = ({
   addBodyField,
   addResponseField,
 }) => {
+  const matchesSection = (
+    row: ApiSchemaRow,
+    section: NonNullable<ApiSchemaRow['section']>,
+  ) => {
+    if (section === 'response') {
+      return row.section === 'response' || row.section === undefined;
+    }
+    return row.section === section;
+  };
+
+  const cascadeDelete = (
+    list: ApiSchemaRow[],
+    index: number,
+    section?: ApiSchemaRow['section'],
+  ) => {
+    const parent = list[index];
+    const parentDepth = parent?.depth ?? 0;
+    let end = index + 1;
+    while (end < list.length) {
+      const item = list[end];
+      if (
+        (section && !matchesSection(item, section)) ||
+        (item.depth ?? 0) <= parentDepth
+      ) {
+        break;
+      }
+      end += 1;
+    }
+    return [...list.slice(0, index), ...list.slice(end)];
+  };
+
+  const [queryViewMode, setQueryViewMode] = useState<'table' | 'json'>('table');
+  const [bodyViewMode, setBodyViewMode] = useState<'table' | 'json'>('table');
+  const [responseViewMode, setResponseViewMode] = useState<'table' | 'json'>('table');
+  const [queryJsonText, setQueryJsonText] = useState('');
+  const [bodyJsonText, setBodyJsonText] = useState('');
+  const [responseJsonText, setResponseJsonText] = useState('');
+  const [queryJsonDirty, setQueryJsonDirty] = useState(false);
+  const [bodyJsonDirty, setBodyJsonDirty] = useState(false);
+  const [responseJsonDirty, setResponseJsonDirty] = useState(false);
+  const [queryJsonStatus, setQueryJsonStatus] = useState<JsonStatusState | null>(
+    null,
+  );
+  const [bodyJsonStatus, setBodyJsonStatus] = useState<JsonStatusState | null>(
+    null,
+  );
+  const [responseJsonStatus, setResponseJsonStatus] =
+    useState<JsonStatusState | null>(null);
+
+  const mergeSectionRows = (
+    source: ApiSchemaRow[],
+    rows: ApiSchemaRow[],
+    section: NonNullable<ApiSchemaRow['section']>,
+  ) => {
+    if (section === 'query') {
+      return [...rows, ...source.filter((row) => !matchesSection(row, 'query'))];
+    }
+
+    if (section === 'body') {
+      const queryRows = source.filter((row) => matchesSection(row, 'query'));
+      const otherRows = source.filter(
+        (row) => !matchesSection(row, 'query') && !matchesSection(row, 'body'),
+      );
+      return [...queryRows, ...rows, ...otherRows];
+    }
+
+    return rows;
+  };
+
+  const normalizeSchemaType = (value: unknown): ApiSchemaRow['type'] => {
+    if (
+      value === 'string' ||
+      value === 'number' ||
+      value === 'boolean' ||
+      value === 'object' ||
+      value === 'array' ||
+      value === 'integer'
+    ) {
+      return value;
+    }
+    return 'string';
+  };
+
+  const normalizeNestedSchemaNode = (value: unknown): NestedSchemaNode => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return { type: 'string' };
+    }
+    const record = value as Record<string, unknown>;
+    return {
+      type: normalizeSchemaType(record.type),
+      description:
+        typeof record.description === 'string'
+          ? record.description
+          : typeof record.desc === 'string'
+            ? record.desc
+            : undefined,
+      required: Boolean(record.required),
+      properties:
+        record.properties &&
+        typeof record.properties === 'object' &&
+        !Array.isArray(record.properties)
+          ? (record.properties as Record<string, NestedSchemaNode>)
+          : undefined,
+      items:
+        record.items &&
+        typeof record.items === 'object' &&
+        !Array.isArray(record.items)
+          ? normalizeNestedSchemaNode(record.items)
+          : undefined,
+    };
+  };
+
+  const entriesToProperties = (entries: NamedNestedSchemaNode[]) =>
+    Object.fromEntries(entries.map((entry) => [entry.name, entry.node]));
+
+  const collectNestedEntries = (
+    rows: ApiSchemaRow[],
+    startIndex: number,
+    parentDepth: number,
+  ): { entries: NamedNestedSchemaNode[]; nextIndex: number } => {
+    const entries: NamedNestedSchemaNode[] = [];
+    let currentIndex = startIndex;
+
+    while (currentIndex < rows.length) {
+      const currentRow = rows[currentIndex];
+      const currentDepth = currentRow.depth ?? 0;
+
+      if (currentDepth <= parentDepth) {
+        break;
+      }
+
+      if (currentDepth !== parentDepth + 1) {
+        currentIndex += 1;
+        continue;
+      }
+
+      const result = buildNestedEntry(rows, currentIndex);
+      entries.push(result.entry);
+      currentIndex = result.nextIndex;
+    }
+
+    return {
+      entries,
+      nextIndex: currentIndex,
+    };
+  };
+
+  const buildNestedEntry = (
+    rows: ApiSchemaRow[],
+    index: number,
+  ): { entry: NamedNestedSchemaNode; nextIndex: number } => {
+    const row = rows[index];
+    const depth = row.depth ?? 0;
+    const baseNode: NestedSchemaNode = {
+      type: normalizeSchemaType(row.type),
+      description: row.desc || undefined,
+      required: row.required,
+    };
+
+    if (row.type === 'object') {
+      const { entries, nextIndex } = collectNestedEntries(rows, index + 1, depth);
+      return {
+        entry: {
+          name: row.name,
+          node: {
+            ...baseNode,
+            properties: entriesToProperties(entries),
+          },
+        },
+        nextIndex,
+      };
+    }
+
+    if (row.type === 'array') {
+      const { entries, nextIndex } = collectNestedEntries(rows, index + 1, depth);
+      let items: NestedSchemaNode | undefined;
+
+      if (entries.length === 1 && entries[0].name === 'item') {
+        items = entries[0].node;
+      } else if (entries.length > 0) {
+        items = {
+          type: 'object',
+          properties: entriesToProperties(entries),
+        };
+      }
+
+      return {
+        entry: {
+          name: row.name,
+          node: {
+            ...baseNode,
+            ...(items ? { items } : {}),
+          },
+        },
+        nextIndex,
+      };
+    }
+
+    return {
+      entry: {
+        name: row.name,
+        node: baseNode,
+      },
+      nextIndex: index + 1,
+    };
+  };
+
+  const buildSectionSchema = (
+    rows: ApiSchemaRow[],
+    section: NonNullable<ApiSchemaRow['section']>,
+  ): NestedSchemaNode => {
+    const sectionRows = rows.filter((row) => matchesSection(row, section));
+    const { entries } = collectNestedEntries(sectionRows, 0, -1);
+    return {
+      type: 'object',
+      properties: entriesToProperties(entries),
+    };
+  };
+
+  const flattenNestedNode = (
+    name: string,
+    node: NestedSchemaNode,
+    depth: number,
+    section: NonNullable<ApiSchemaRow['section']>,
+  ): ApiSchemaRow[] => {
+    const rows: ApiSchemaRow[] = [
+      {
+        name,
+        type: normalizeSchemaType(node.type),
+        required: Boolean(node.required),
+        desc: node.description || '',
+        depth,
+        section,
+      },
+    ];
+
+    if (node.type === 'object' && node.properties) {
+      Object.entries(node.properties).forEach(([childName, childNode]) => {
+        rows.push(
+          ...flattenNestedNode(
+            childName,
+            normalizeNestedSchemaNode(childNode),
+            depth + 1,
+            section,
+          ),
+        );
+      });
+    }
+
+    if (node.type === 'array' && node.items) {
+      const itemsNode = normalizeNestedSchemaNode(node.items);
+      if (itemsNode.type === 'object' && itemsNode.properties) {
+        Object.entries(itemsNode.properties).forEach(([childName, childNode]) => {
+          rows.push(
+            ...flattenNestedNode(
+              childName,
+              normalizeNestedSchemaNode(childNode),
+              depth + 1,
+              section,
+            ),
+          );
+        });
+      } else {
+        rows.push(
+          ...flattenNestedNode('item', itemsNode, depth + 1, section),
+        );
+      }
+    }
+
+    return rows;
+  };
+
+  const parseNestedSchemaJson = (
+    text: string,
+    section: NonNullable<ApiSchemaRow['section']>,
+  ): ApiSchemaRow[] | null => {
+    try {
+      const parsed = JSON.parse(text) as unknown;
+      let rootNode: NestedSchemaNode;
+
+      if (
+        parsed &&
+        typeof parsed === 'object' &&
+        !Array.isArray(parsed) &&
+        !('type' in (parsed as Record<string, unknown>))
+      ) {
+        rootNode = {
+          type: 'object',
+          properties: parsed as Record<string, NestedSchemaNode>,
+        };
+      } else {
+        rootNode = normalizeNestedSchemaNode(parsed);
+      }
+
+      if (rootNode.type !== 'object') {
+        return null;
+      }
+
+      const rows: ApiSchemaRow[] = [];
+      Object.entries(rootNode.properties || {}).forEach(([name, node]) => {
+        rows.push(
+          ...flattenNestedNode(
+            name,
+            normalizeNestedSchemaNode(node),
+            0,
+            section,
+          ),
+        );
+      });
+
+      return rows;
+    } catch {
+      return null;
+    }
+  };
+
+  const getJsonStatusClasses = (type: JsonStatusType) => {
+    switch (type) {
+      case 'success':
+        return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+      case 'error':
+        return 'border-rose-200 bg-rose-50 text-rose-700';
+      default:
+        return 'border-blue-200 bg-blue-50 text-blue-700';
+    }
+  };
+
+  const renderJsonEditor = (
+    text: string,
+    setText: (value: string) => void,
+    setDirty: (value: boolean) => void,
+    status: JsonStatusState | null,
+    setStatus: (value: JsonStatusState | null) => void,
+    onApply: () => void,
+  ) => (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          {t('schemaViewJson')}
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            try {
+              const formatted = JSON.stringify(JSON.parse(text), null, 2);
+              setText(formatted);
+              setDirty(true);
+              setStatus({
+                type: 'info',
+                message: t('schemaJsonDirty'),
+              });
+            } catch {
+              setStatus({
+                type: 'error',
+                message: t('schemaJsonInvalid'),
+              });
+            }
+          }}
+          className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
+        >
+          {t('schemaJsonFormat')}
+        </button>
+      </div>
+      <JsonCodeEditor
+        value={text}
+        onChange={(value) => {
+          setText(value);
+          setDirty(true);
+          setStatus({
+            type: 'info',
+            message: t('schemaJsonDirty'),
+          });
+        }}
+        onBlur={onApply}
+      />
+      {status && (
+        <div
+          className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[10px] ${getJsonStatusClasses(
+            status.type,
+          )}`}
+        >
+          {status.type === 'error' ? (
+            <AlertCircle size={12} />
+          ) : (
+            <CheckCircle2 size={12} />
+          )}
+          <span>{status.message}</span>
+        </div>
+      )}
+    </div>
+  );
+
+  useEffect(() => {
+    if (queryViewMode === 'json' && !queryJsonDirty) {
+      setQueryJsonText(
+        JSON.stringify(buildSectionSchema(requestParams, 'query'), null, 2),
+      );
+      setQueryJsonStatus({
+        type: 'info',
+        message: t('schemaJsonSynced'),
+      });
+    }
+  }, [queryViewMode, queryJsonDirty, requestParams, t]);
+
+  useEffect(() => {
+    if (bodyViewMode === 'json' && !bodyJsonDirty) {
+      setBodyJsonText(
+        JSON.stringify(buildSectionSchema(requestParams, 'body'), null, 2),
+      );
+      setBodyJsonStatus({
+        type: 'info',
+        message: t('schemaJsonSynced'),
+      });
+    }
+  }, [bodyViewMode, bodyJsonDirty, requestParams, t]);
+
+  useEffect(() => {
+    if (responseViewMode === 'json' && !responseJsonDirty) {
+      setResponseJsonText(
+        JSON.stringify(buildSectionSchema(responseSchema, 'response'), null, 2),
+      );
+      setResponseJsonStatus({
+        type: 'info',
+        message: t('schemaJsonSynced'),
+      });
+    }
+  }, [responseViewMode, responseJsonDirty, responseSchema, t]);
+
   switch (activeTab) {
     case 'params':
       return (
@@ -71,54 +521,134 @@ const ApiTabContent: React.FC<ApiTabContentProps> = ({
               <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                 {t('schemaQueryTitle')}
               </h5>
-              <button
-                type="button"
-                onClick={addQueryParamField}
-                className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
-              >
-                <Plus size={12} /> {t('schemaAddField')}
-              </button>
+              <div className="flex items-center gap-2">
+                <div className="flex rounded-full bg-slate-100 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setQueryViewMode('table')}
+                    className={`px-2 py-0.5 text-[10px] rounded-full ${
+                      queryViewMode === 'table'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-slate-400'
+                    }`}
+                  >
+                    {t('schemaViewTable')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQueryJsonDirty(false);
+                      setQueryJsonStatus({
+                        type: 'info',
+                        message: t('schemaJsonSynced'),
+                      });
+                      setQueryJsonText(
+                        JSON.stringify(buildSectionSchema(requestParams, 'query'), null, 2),
+                      );
+                      setQueryViewMode('json');
+                    }}
+                    className={`px-2 py-0.5 text-[10px] rounded-full ${
+                      queryViewMode === 'json'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-slate-400'
+                    }`}
+                  >
+                    {t('schemaViewJson')}
+                  </button>
+                </div>
+                {queryViewMode === 'table' && (
+                  <button
+                    type="button"
+                    onClick={addQueryParamField}
+                    className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
+                  >
+                    <Plus size={12} /> {t('schemaAddField')}
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
-              <table className="w-full text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    <th className="px-3 py-1.5 text-left font-bold text-slate-500 w-1/3">
-                      {t('schemaFieldName')}
-                    </th>
-                    <th className="px-3 py-1.5 text-left font-bold text-slate-500 w-24">
-                      {t('schemaType')}
-                    </th>
-                    <th className="px-3 py-1.5 text-center font-bold text-slate-500 w-20">
-                      {t('schemaRequired')}
-                    </th>
-                    <th className="px-3 py-1.5 text-left font-bold text-slate-500">
-                      {t('schemaDescription')}
-                    </th>
-                    <th className="px-3 py-1.5 w-10"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {requestParams.map((row, index) =>
-                    row.section === 'query' ? (
-                      <SchemaRow
-                        key={`query-${index}`}
-                        row={row}
-                        onChange={(next) => {
-                          const list = [...requestParams];
-                          list[index] = next;
-                          setRequestParams(list);
-                        }}
-                        onDelete={() => {
-                          setRequestParams(requestParams.filter((_, i) => i !== index));
-                        }}
-                        descriptionPlaceholder={t('schemaDescription')}
-                      />
-                    ) : null,
-                  )}
-                </tbody>
-              </table>
-            </div>
+            {queryViewMode === 'table' ? (
+              <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
+                <table className="w-full text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      <th className="px-3 py-1.5 text-left font-bold text-slate-500 w-1/3">
+                        {t('schemaFieldName')}
+                      </th>
+                      <th className="px-3 py-1.5 text-left font-bold text-slate-500 w-24">
+                        {t('schemaType')}
+                      </th>
+                      <th className="px-3 py-1.5 text-center font-bold text-slate-500 w-20">
+                        {t('schemaRequired')}
+                      </th>
+                      <th className="px-3 py-1.5 text-left font-bold text-slate-500">
+                        {t('schemaDescription')}
+                      </th>
+                      <th className="px-3 py-1.5 w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {requestParams.map((row, index) =>
+                      row.section === 'query' ? (
+                        <SchemaRow
+                          key={`query-${index}`}
+                          row={row}
+                          onChange={(next) => {
+                            const list = [...requestParams];
+                            list[index] = next;
+                            setRequestParams(list);
+                          }}
+                          onDelete={() => {
+                            setRequestParams(cascadeDelete(requestParams, index, 'query'));
+                          }}
+                          onAddChild={() => {
+                            const parentDepth = row.depth ?? 0;
+                            const list = [...requestParams];
+                            list.splice(index + 1, 0, {
+                              name: 'childField',
+                              type: 'string',
+                              required: false,
+                              desc: '',
+                              depth: parentDepth + 1,
+                              section: 'query',
+                            });
+                            setRequestParams(list);
+                          }}
+                          descriptionPlaceholder={t('schemaDescription')}
+                        />
+                      ) : null,
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              renderJsonEditor(
+                queryJsonText,
+                setQueryJsonText,
+                setQueryJsonDirty,
+                queryJsonStatus,
+                setQueryJsonStatus,
+                () => {
+                  const parsed = parseNestedSchemaJson(queryJsonText, 'query');
+                  if (!parsed) {
+                    setQueryJsonStatus({
+                      type: 'error',
+                      message: t('schemaJsonInvalid'),
+                    });
+                    return;
+                  }
+                  setRequestParams(mergeSectionRows(requestParams, parsed, 'query'));
+                  setQueryJsonText(
+                    JSON.stringify(buildSectionSchema(mergeSectionRows(requestParams, parsed, 'query'), 'query'), null, 2),
+                  );
+                  setQueryJsonDirty(false);
+                  setQueryJsonStatus({
+                    type: 'success',
+                    message: t('schemaJsonApplied'),
+                  });
+                },
+              )
+            )}
           </div>
 
           <div className="space-y-2">
@@ -126,54 +656,134 @@ const ApiTabContent: React.FC<ApiTabContentProps> = ({
               <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                 {t('schemaBodyTitle')}
               </h5>
-              <button
-                type="button"
-                onClick={addBodyField}
-                className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
-              >
-                <Plus size={12} /> {t('schemaAddField')}
-              </button>
+              <div className="flex items-center gap-2">
+                <div className="flex rounded-full bg-slate-100 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setBodyViewMode('table')}
+                    className={`px-2 py-0.5 text-[10px] rounded-full ${
+                      bodyViewMode === 'table'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-slate-400'
+                    }`}
+                  >
+                    {t('schemaViewTable')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBodyJsonDirty(false);
+                      setBodyJsonStatus({
+                        type: 'info',
+                        message: t('schemaJsonSynced'),
+                      });
+                      setBodyJsonText(
+                        JSON.stringify(buildSectionSchema(requestParams, 'body'), null, 2),
+                      );
+                      setBodyViewMode('json');
+                    }}
+                    className={`px-2 py-0.5 text-[10px] rounded-full ${
+                      bodyViewMode === 'json'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-slate-400'
+                    }`}
+                  >
+                    {t('schemaViewJson')}
+                  </button>
+                </div>
+                {bodyViewMode === 'table' && (
+                  <button
+                    type="button"
+                    onClick={addBodyField}
+                    className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
+                  >
+                    <Plus size={12} /> {t('schemaAddField')}
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
-              <table className="w-full text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    <th className="px-3 py-1.5 text-left font-bold text-slate-500 w-1/3">
-                      {t('schemaFieldName')}
-                    </th>
-                    <th className="px-3 py-1.5 text-left font-bold text-slate-500 w-24">
-                      {t('schemaType')}
-                    </th>
-                    <th className="px-3 py-1.5 text-center font-bold text-slate-500 w-20">
-                      {t('schemaRequired')}
-                    </th>
-                    <th className="px-3 py-1.5 text-left font-bold text-slate-500">
-                      {t('schemaDescription')}
-                    </th>
-                    <th className="px-3 py-1.5 w-10"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {requestParams.map((row, index) =>
-                    row.section === 'body' ? (
-                      <SchemaRow
-                        key={`body-${index}`}
-                        row={row}
-                        onChange={(next) => {
-                          const list = [...requestParams];
-                          list[index] = next;
-                          setRequestParams(list);
-                        }}
-                        onDelete={() => {
-                          setRequestParams(requestParams.filter((_, i) => i !== index));
-                        }}
-                        descriptionPlaceholder={t('schemaDescription')}
-                      />
-                    ) : null,
-                  )}
-                </tbody>
-              </table>
-            </div>
+            {bodyViewMode === 'table' ? (
+              <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
+                <table className="w-full text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      <th className="px-3 py-1.5 text-left font-bold text-slate-500 w-1/3">
+                        {t('schemaFieldName')}
+                      </th>
+                      <th className="px-3 py-1.5 text-left font-bold text-slate-500 w-24">
+                        {t('schemaType')}
+                      </th>
+                      <th className="px-3 py-1.5 text-center font-bold text-slate-500 w-20">
+                        {t('schemaRequired')}
+                      </th>
+                      <th className="px-3 py-1.5 text-left font-bold text-slate-500">
+                        {t('schemaDescription')}
+                      </th>
+                      <th className="px-3 py-1.5 w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {requestParams.map((row, index) =>
+                      row.section === 'body' ? (
+                        <SchemaRow
+                          key={`body-${index}`}
+                          row={row}
+                          onChange={(next) => {
+                            const list = [...requestParams];
+                            list[index] = next;
+                            setRequestParams(list);
+                          }}
+                          onDelete={() => {
+                            setRequestParams(cascadeDelete(requestParams, index, 'body'));
+                          }}
+                          onAddChild={() => {
+                            const parentDepth = row.depth ?? 0;
+                            const list = [...requestParams];
+                            list.splice(index + 1, 0, {
+                              name: 'childField',
+                              type: 'string',
+                              required: false,
+                              desc: '',
+                              depth: parentDepth + 1,
+                              section: 'body',
+                            });
+                            setRequestParams(list);
+                          }}
+                          descriptionPlaceholder={t('schemaDescription')}
+                        />
+                      ) : null,
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              renderJsonEditor(
+                bodyJsonText,
+                setBodyJsonText,
+                setBodyJsonDirty,
+                bodyJsonStatus,
+                setBodyJsonStatus,
+                () => {
+                  const parsed = parseNestedSchemaJson(bodyJsonText, 'body');
+                  if (!parsed) {
+                    setBodyJsonStatus({
+                      type: 'error',
+                      message: t('schemaJsonInvalid'),
+                    });
+                    return;
+                  }
+                  setRequestParams(mergeSectionRows(requestParams, parsed, 'body'));
+                  setBodyJsonText(
+                    JSON.stringify(buildSectionSchema(mergeSectionRows(requestParams, parsed, 'body'), 'body'), null, 2),
+                  );
+                  setBodyJsonDirty(false);
+                  setBodyJsonStatus({
+                    type: 'success',
+                    message: t('schemaJsonApplied'),
+                  });
+                },
+              )
+            )}
           </div>
         </div>
       );
@@ -329,49 +939,129 @@ const ApiTabContent: React.FC<ApiTabContentProps> = ({
               <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                 {t('responseSchemaTitle')}
               </h5>
-              <button
-                type="button"
-                onClick={addResponseField}
-                className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-1 cursor-pointer"
-              >
-                <Plus size={12} /> {t('schemaAddField')}
-              </button>
+              <div className="flex items-center gap-2">
+                <div className="flex rounded-full bg-slate-100 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setResponseViewMode('table')}
+                    className={`px-2 py-0.5 text-[10px] rounded-full ${
+                      responseViewMode === 'table'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-slate-400'
+                    }`}
+                  >
+                    {t('schemaViewTable')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResponseJsonDirty(false);
+                      setResponseJsonStatus({
+                        type: 'info',
+                        message: t('schemaJsonSynced'),
+                      });
+                      setResponseJsonText(
+                        JSON.stringify(buildSectionSchema(responseSchema, 'response'), null, 2),
+                      );
+                      setResponseViewMode('json');
+                    }}
+                    className={`px-2 py-0.5 text-[10px] rounded-full ${
+                      responseViewMode === 'json'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-slate-400'
+                    }`}
+                  >
+                    {t('schemaViewJson')}
+                  </button>
+                </div>
+                {responseViewMode === 'table' && (
+                  <button
+                    type="button"
+                    onClick={addResponseField}
+                    className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus size={12} /> {t('schemaAddField')}
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
-              <table className="w-full text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    <th className="px-3 py-1.5 text-left font-bold text-slate-500">
-                      {t('responseSchemaField')}
-                    </th>
-                    <th className="px-3 py-1.5 text-left font-bold text-slate-500 w-20">
-                      {t('schemaType')}
-                    </th>
-                    <th className="px-3 py-1.5 text-left font-bold text-slate-500">
-                      {t('responseSchemaDescShort')}
-                    </th>
-                    <th className="px-3 py-1.5 w-10"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {responseSchema.map((row, index) => (
-                    <SchemaRow
-                      key={`response-${index}`}
-                      row={row}
-                      onChange={(next) => {
-                        const list = [...responseSchema];
-                        list[index] = next;
-                        setResponseSchema(list);
-                      }}
-                      onDelete={() => {
-                        setResponseSchema(responseSchema.filter((_, i) => i !== index));
-                      }}
-                      descriptionPlaceholder={t('schemaDescription')}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {responseViewMode === 'table' ? (
+              <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
+                <table className="w-full text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      <th className="px-3 py-1.5 text-left font-bold text-slate-500">
+                        {t('responseSchemaField')}
+                      </th>
+                      <th className="px-3 py-1.5 text-left font-bold text-slate-500 w-20">
+                        {t('schemaType')}
+                      </th>
+                      <th className="px-3 py-1.5 text-left font-bold text-slate-500">
+                        {t('responseSchemaDescShort')}
+                      </th>
+                      <th className="px-3 py-1.5 w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {responseSchema.map((row, index) => (
+                      <SchemaRow
+                        key={`response-${index}`}
+                        row={row}
+                        onChange={(next) => {
+                          const list = [...responseSchema];
+                          list[index] = next;
+                          setResponseSchema(list);
+                        }}
+                        onDelete={() => {
+                          setResponseSchema(cascadeDelete(responseSchema, index, 'response'));
+                        }}
+                        onAddChild={() => {
+                          const parentDepth = row.depth ?? 0;
+                          const list = [...responseSchema];
+                          list.splice(index + 1, 0, {
+                            name: 'childField',
+                            type: 'string',
+                            required: false,
+                            desc: '',
+                            depth: parentDepth + 1,
+                            section: 'response',
+                          });
+                          setResponseSchema(list);
+                        }}
+                        descriptionPlaceholder={t('schemaDescription')}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              renderJsonEditor(
+                responseJsonText,
+                setResponseJsonText,
+                setResponseJsonDirty,
+                responseJsonStatus,
+                setResponseJsonStatus,
+                () => {
+                  const parsed = parseNestedSchemaJson(responseJsonText, 'response');
+                  if (!parsed) {
+                    setResponseJsonStatus({
+                      type: 'error',
+                      message: t('schemaJsonInvalid'),
+                    });
+                    return;
+                  }
+                  setResponseSchema(parsed);
+                  setResponseJsonText(
+                    JSON.stringify(buildSectionSchema(parsed, 'response'), null, 2),
+                  );
+                  setResponseJsonDirty(false);
+                  setResponseJsonStatus({
+                    type: 'success',
+                    message: t('schemaJsonApplied'),
+                  });
+                },
+              )
+            )}
           </div>
         </div>
       );

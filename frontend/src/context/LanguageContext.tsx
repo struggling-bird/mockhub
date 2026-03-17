@@ -177,6 +177,26 @@ export const translations: Translations = {
   schemaType: { en: 'Type', zh: '类型' },
   schemaRequired: { en: 'Required', zh: '必填' },
   schemaDescription: { en: 'Description', zh: '说明' },
+  schemaViewTable: { en: 'Table View', zh: '表格视图' },
+  schemaViewJson: { en: 'JSON View', zh: 'JSON 视图' },
+  schemaJsonInvalid: {
+    en: 'Invalid JSON format, please check.',
+    zh: 'JSON 格式有误，请检查后重试。',
+  },
+  schemaJsonFormat: { en: 'Format JSON', zh: '格式化 JSON' },
+  schemaJsonPreview: { en: 'Highlighted Preview', zh: '高亮预览' },
+  schemaJsonSynced: {
+    en: 'Auto-synced from table view.',
+    zh: '已自动从表格视图同步。',
+  },
+  schemaJsonDirty: {
+    en: 'JSON modified. Blur to validate and apply.',
+    zh: 'JSON 已修改，失焦后校验并应用。',
+  },
+  schemaJsonApplied: {
+    en: 'JSON validated and applied.',
+    zh: 'JSON 校验通过并已应用。',
+  },
   headersRequestTitle: { en: 'Request Headers', zh: '请求头' },
   headersKey: { en: 'Key', zh: '键名' },
   headersValue: { en: 'Value', zh: '取值' },

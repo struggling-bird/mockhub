@@ -265,6 +265,7 @@ export default function(req, res) {
         type: 'string',
         required: false,
         desc: '',
+        section: 'response',
       },
     ]);
   };
