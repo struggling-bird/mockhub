@@ -18,6 +18,23 @@ import {
 
 export type ViewType = 'dashboard' | 'apis' | 'proxies' | 'assets' | 'team' | 'stats' | 'projects';
 
+export type ApiMockMode = 'static' | 'script' | 'proxy';
+
+export interface ApiHeaderRow {
+  key: string;
+  value: string;
+  desc?: string;
+}
+
+export interface ApiSchemaRow {
+  name: string;
+  type: 'string' | 'number' | 'boolean' | 'object' | 'array' | 'integer';
+  required: boolean;
+  desc?: string;
+  depth?: number;
+  section?: 'query' | 'body' | 'response';
+}
+
 export interface ApiItem {
   id: string;
   name: string;
@@ -25,6 +42,16 @@ export interface ApiItem {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   status: 'New' | 'Debugged' | 'To Test' | 'Published';
   lastCall: string;
+
+  // 下面字段仅在详情接口中返回，用于接口文档/Mock
+  requestHeaders?: ApiHeaderRow[] | null;
+  requestParams?: ApiSchemaRow[] | null;
+  responseHeaders?: ApiHeaderRow[] | null;
+  responseSchema?: ApiSchemaRow[] | null;
+  mockStaticBody?: string | null;
+  mockScript?: string | null;
+  mockMode?: ApiMockMode | null;
+  mockProxyUrl?: string | null;
 }
 
 export interface ProxyGroup {

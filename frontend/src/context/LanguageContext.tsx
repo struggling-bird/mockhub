@@ -211,6 +211,18 @@ export const translations: Translations = {
     zh: '2 小时前更新',
   },
   interfaceSaveChanges: { en: 'Save Changes', zh: '保存修改' },
+  apisNoProject: { en: 'No project selected', zh: '未选择项目' },
+  apisSelectProject: { en: 'Select a project in the header to manage APIs.', zh: '请在顶部选择一个项目以管理接口。' },
+  apisLoading: { en: 'Loading...', zh: '加载中...' },
+  apisEmpty: { en: 'No interfaces yet', zh: '暂无接口' },
+  apisEmptyHint: { en: 'Click "New Interface" to add one.', zh: '点击「新建接口」添加。' },
+  lastCallNever: { en: 'Never', zh: '从未' },
+  apiNewTitle: { en: 'New Interface', zh: '新建接口' },
+  apiNewName: { en: 'Name', zh: '名称' },
+  apiNewPath: { en: 'Path', zh: '路径' },
+  apiCreate: { en: 'Create', zh: '创建' },
+  saveSuccess: { en: 'Saved', zh: '已保存' },
+  deleteSuccess: { en: 'Deleted', zh: '已删除' },
 
   // Proxy config
   proxyGroupsTitle: { en: 'Proxy Groups', zh: '代理分组' },

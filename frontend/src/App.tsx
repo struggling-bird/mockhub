@@ -116,7 +116,7 @@ function AppContent() {
     if (path.startsWith('/projects/new')) return t('createProject');
     if (path.startsWith('/projects/edit')) return t('editProject') || 'Edit Project';
     if (path.startsWith('/projects')) return t('projects');
-    if (path.startsWith('/apis')) return t('apis');
+    if (path.startsWith('/interfaces')) return t('apis');
     if (path.startsWith('/proxies')) return t('proxies');
     if (path.startsWith('/assets')) return t('assets');
     if (path.startsWith('/team')) return t('team');
@@ -215,7 +215,7 @@ function AppContent() {
               <Route path="/projects" element={<ProjectManagement />} />
               <Route path="/projects/new" element={<ProjectForm />} />
               <Route path="/projects/edit/:id" element={<ProjectForm />} />
-              <Route path="/apis" element={<ApiTable />} />
+              <Route path="/interfaces" element={<ApiTable />} />
               <Route path="/proxies" element={<ProxyConfig />} />
               <Route path="/assets" element={<PublicAssets />} />
               <Route path="/team" element={<TeamManagement />} />

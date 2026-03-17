@@ -1,22 +1,252 @@
-import React, { useState } from 'react';
-import { 
+import React, { useState, useEffect, useCallback } from 'react';
+import {
   Search, Plus, MoreVertical, Code2, ChevronRight, Globe, Clock, Settings2, Trash2, Save, X, Copy, 
   Info, Terminal, ShieldCheck, Zap, Database, ListFilter, ChevronDown, Braces, Type, AlertCircle,
   Server, Cpu, FileJson, Folder, FolderTree, List
 } from 'lucide-react';
-import { MOCK_APIS } from '../types';
+import type { ApiItem, ApiHeaderRow, ApiSchemaRow, ApiMockMode } from '../types';
 import SelectableInput from '../components/SelectableInput';
 import { useLanguage } from '../context/LanguageContext';
+import { formatLastCall } from '../utils/relativeTime';
 
 const ApiTable: React.FC = () => {
-  const [selectedApiId, setSelectedApiId] = useState<string | null>(MOCK_APIS[0].id);
+  const projectId = window.localStorage.getItem('mockhub_project_id');
+  const [apis, setApis] = useState<ApiItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedApiId, setSelectedApiId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editPath, setEditPath] = useState('/api/v1');
+  const [editMethod, setEditMethod] = useState<ApiItem['method']>('GET');
+  const [editStatus, setEditStatus] = useState<ApiItem['status']>('New');
+  const [saving, setSaving] = useState(false);
+  const [showNewForm, setShowNewForm] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newPath, setNewPath] = useState('/api/v1');
+  const [newMethod, setNewMethod] = useState<ApiItem['method']>('GET');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('headers');
-  const [responseMode, setResponseMode] = useState<'static' | 'script' | 'proxy'>('static');
+  const [responseMode, setResponseMode] = useState<ApiMockMode>('static');
   const [proxyUrl, setProxyUrl] = useState('https://api.production.com');
   const [viewMode, setViewMode] = useState<'list' | 'tree'>('list');
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['/api', '/api/v1']));
   const { t } = useLanguage();
+
+  const [detail, setDetail] = useState<ApiItem | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  // headers / schema 本地可编辑 state
+  const [requestHeaders, setRequestHeaders] = useState<ApiHeaderRow[]>([]);
+  const [responseHeaders, setResponseHeaders] = useState<ApiHeaderRow[]>([]);
+  const [requestParams, setRequestParams] = useState<ApiSchemaRow[]>([]);
+  const [responseSchema, setResponseSchema] = useState<ApiSchemaRow[]>([]);
+  const [mockStaticBody, setMockStaticBody] = useState<string>('');
+  const [mockScript, setMockScript] = useState<string>('');
+
+  const fetchApis = useCallback(async () => {
+    if (!projectId) {
+      setApis([]);
+      setLoading(false);
+      return;
+    }
+    const token = window.localStorage.getItem('mockhub_token');
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/apis`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = (await res.json()) as (Omit<ApiItem, 'lastCall'> & { lastCall: string })[];
+        setApis(data.map((a) => ({ ...a, lastCall: formatLastCall(a.lastCall) || t('lastCallNever') })));
+        setSelectedApiId((prev) =>
+          prev && data.some((d) => d.id === prev) ? prev : data[0]?.id ?? null,
+        );
+      } else {
+        setApis([]);
+      }
+    } catch {
+      setApis([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId, t]);
+
+  useEffect(() => {
+    fetchApis();
+  }, [fetchApis]);
+
+  const selectedApi = apis.find((a) => a.id === selectedApiId);
+  useEffect(() => {
+    if (!selectedApi || !projectId) {
+      setDetail(null);
+      return;
+    }
+    const token = window.localStorage.getItem('mockhub_token');
+    if (!token) return;
+
+    const loadDetail = async () => {
+      setDetailLoading(true);
+      try {
+        const res = await fetch(
+          `/api/projects/${projectId}/apis/${selectedApi.id}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+        if (res.ok) {
+          const data = (await res.json()) as ApiItem;
+          setDetail(data);
+          setEditName(data.name);
+          setEditPath(data.path || '/api/v1');
+          setEditMethod(data.method);
+          setEditStatus(data.status);
+          setResponseMode((data.mockMode as ApiMockMode) || 'static');
+          setProxyUrl(
+            data.mockProxyUrl || 'https://api.production.com',
+          );
+          setRequestHeaders(data.requestHeaders || []);
+          setResponseHeaders(data.responseHeaders || []);
+          setRequestParams(data.requestParams || []);
+          setResponseSchema(data.responseSchema || []);
+          setMockStaticBody(
+            data.mockStaticBody ||
+              JSON.stringify(
+                {
+                  status: 'success',
+                  data: {
+                    id: 'user_9921',
+                    name: 'John Doe',
+                  },
+                },
+                null,
+                2,
+              ),
+          );
+          setMockScript(
+            data.mockScript ||
+              `/**
+ * @param {Request} req - Incoming request
+ * @param {Response} res - Response helper
+ */
+export default function(req, res) {
+  const { id } = req.query;
+  
+  // Logic based on input
+  if (id === 'test') {
+    return res.status(200).json({
+      mode: "test_active",
+      mocked: true
+    });
+  }
+
+  // Simulate network latency
+  res.delay(200);
+
+  return res.json({
+    id: id || "anon_0",
+    timestamp: Date.now(),
+    data: {
+      status: "online",
+      version: "v2"
+    }
+  });
+}`,
+          );
+        }
+      } finally {
+        setDetailLoading(false);
+      }
+    };
+
+    loadDetail();
+  }, [projectId, selectedApi?.id]);
+
+  const handleSave = async () => {
+    if (!selectedApi || !projectId) return;
+    const token = window.localStorage.getItem('mockhub_token');
+    if (!token) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/apis/${selectedApi.id}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: editName,
+          path: editPath || '/api/v1',
+          method: editMethod,
+          status: editStatus,
+          requestHeaders,
+          requestParams,
+          responseHeaders,
+          responseSchema,
+          mockStaticBody,
+          mockScript,
+          mockMode: responseMode,
+          mockProxyUrl: proxyUrl,
+        }),
+      });
+      if (res.ok) {
+        await fetchApis();
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedApi || !projectId) return;
+    const token = window.localStorage.getItem('mockhub_token');
+    if (!token) return;
+    if (!window.confirm(t('interfaceSaveChanges') ? 'Delete this interface?' : '确定删除该接口？')) return;
+    try {
+      const res = await fetch(`/api/projects/${projectId}/apis/${selectedApi.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const next = apis.filter((a) => a.id !== selectedApi.id);
+        setApis(next);
+        setSelectedApiId(next[0]?.id ?? null);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleCreate = async () => {
+    if (!projectId) return;
+    const token = window.localStorage.getItem('mockhub_token');
+    if (!token) return;
+    try {
+      const res = await fetch(`/api/projects/${projectId}/apis`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newName || 'New Interface',
+          path: newPath || '/api/v1',
+          method: newMethod,
+        }),
+      });
+      if (res.ok) {
+        setShowNewForm(false);
+        setNewName('');
+        setNewPath('/api/v1');
+        setNewMethod('GET');
+        await fetchApis();
+      }
+    } catch {
+      // ignore
+    }
+  };
 
   const toggleFolder = (path: string) => {
     const newExpanded = new Set(expandedFolders);
@@ -143,8 +373,6 @@ const ApiTable: React.FC = () => {
     'https://mock-server.dev'
   ];
 
-  const selectedApi = MOCK_APIS.find(api => api.id === selectedApiId);
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Published': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
@@ -162,19 +390,53 @@ const ApiTable: React.FC = () => {
     { id: 'mock', label: t('tabsMock'), icon: Zap },
   ];
 
-  const SchemaRow: React.FC<{ name: string; type: string; required: boolean; desc: string; depth?: number }> = ({ name, type, required, desc, depth = 0 }) => (
+  const updateSchemaRow = (
+    list: ApiSchemaRow[],
+    index: number,
+    patch: Partial<ApiSchemaRow>,
+  ) => {
+    const next = [...list];
+    next[index] = { ...next[index], ...patch };
+    return next;
+  };
+
+  const SchemaRow: React.FC<{
+    row: ApiSchemaRow;
+    index: number;
+    onChange: (row: ApiSchemaRow) => void;
+    onDelete?: () => void;
+  }> = ({ row, index, onChange, onDelete }) => (
     <tr className="hover:bg-slate-50/50 group">
       <td className="px-3 py-1.5">
-        <div className="flex items-center gap-2" style={{ paddingLeft: `${depth * 20}px` }}>
-          {type === 'object' || type === 'array' ? <ChevronDown size={12} className="text-slate-400" /> : <div className="w-3" />}
-          <input type="text" defaultValue={name} className="bg-transparent outline-none text-slate-900 font-mono text-xs w-full" />
+        <div
+          className="flex items-center gap-2"
+          style={{ paddingLeft: `${(row.depth ?? 0) * 20}px` }}
+        >
+          {row.type === 'object' || row.type === 'array' ? (
+            <ChevronDown size={12} className="text-slate-400" />
+          ) : (
+            <div className="w-3" />
+          )}
+          <input
+            type="text"
+            value={row.name}
+            onChange={(e) =>
+              onChange({ ...row, name: e.target.value })
+            }
+            className="bg-transparent outline-none text-slate-900 font-mono text-xs w-full"
+          />
         </div>
       </td>
         <td className="px-3 py-1.5">
           <SelectableInput
             options={['string', 'number', 'boolean', 'object', 'array', 'integer']}
-            value={type}
-            onChange={() => {}}
+            value={row.type}
+            onChange={(val) =>
+              onChange({
+                ...row,
+                type: val as ApiSchemaRow['type'],
+              })
+            }
             allowCustom={false}
             showSearch={false}
             size="sm"
@@ -183,18 +445,34 @@ const ApiTable: React.FC = () => {
           />
         </td>
       <td className="px-3 py-1.5 text-center">
-        <input type="checkbox" defaultChecked={required} className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+        <input
+          type="checkbox"
+          checked={row.required}
+          onChange={(e) =>
+            onChange({ ...row, required: e.target.checked })
+          }
+          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+        />
       </td>
       <td className="px-3 py-1.5">
         <input
           type="text"
-          defaultValue={desc}
+          value={row.desc || ''}
+          onChange={(e) =>
+            onChange({ ...row, desc: e.target.value })
+          }
           placeholder={t('schemaDescription')}
           className="w-full bg-transparent outline-none text-slate-400 italic text-xs"
         />
       </td>
       <td className="px-3 py-1.5 text-right opacity-0 group-hover:opacity-100 transition-opacity">
-        <button className="p-1 text-slate-300 hover:text-rose-500"><Trash2 size={12} /></button>
+        <button
+          type="button"
+          onClick={onDelete}
+          className="p-1 text-slate-300 hover:text-rose-500 cursor-pointer"
+        >
+          <Trash2 size={12} />
+        </button>
       </td>
     </tr>
   );
@@ -233,9 +511,38 @@ const ApiTable: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    <SchemaRow name="page" type="integer" required={true} desc="Page number" />
-                    <SchemaRow name="limit" type="integer" required={false} desc="Items per page" />
-                    <SchemaRow name="filter" type="string" required={false} desc="Search filter" />
+                    {requestParams
+                      .filter((r) => r.section === 'query')
+                      .map((row, index) => (
+                        <SchemaRow
+                          key={`query-${index}`}
+                          row={row}
+                          index={index}
+                          onChange={(next) => {
+                            const list = [...requestParams];
+                            const realIndex = requestParams.findIndex(
+                              (r, i) =>
+                                r.section === 'query' &&
+                                i === index,
+                            );
+                            if (realIndex >= 0) {
+                              list[realIndex] = next;
+                              setRequestParams(list);
+                            }
+                          }}
+                          onDelete={() => {
+                            setRequestParams(
+                              requestParams.filter(
+                                (_, i) =>
+                                  !(
+                                    requestParams[i].section ===
+                                      'query' && i === index
+                                  ),
+                              ),
+                            );
+                          }}
+                        />
+                      ))}
                   </tbody>
                 </table>
               </div>
@@ -270,10 +577,38 @@ const ApiTable: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    <SchemaRow name="user" type="object" required={true} desc="User information" />
-                    <SchemaRow name="id" type="string" required={true} desc="User unique ID" depth={1} />
-                    <SchemaRow name="name" type="string" required={true} desc="Display name" depth={1} />
-                    <SchemaRow name="email" type="string" required={false} desc="Contact email" depth={1} />
+                    {requestParams
+                      .filter((r) => r.section === 'body')
+                      .map((row, index) => (
+                        <SchemaRow
+                          key={`body-${index}`}
+                          row={row}
+                          index={index}
+                          onChange={(next) => {
+                            const list = [...requestParams];
+                            const realIndex = requestParams.findIndex(
+                              (r, i) =>
+                                r.section === 'body' &&
+                                i === index,
+                            );
+                            if (realIndex >= 0) {
+                              list[realIndex] = next;
+                              setRequestParams(list);
+                            }
+                          }}
+                          onDelete={() => {
+                            setRequestParams(
+                              requestParams.filter(
+                                (_, i) =>
+                                  !(
+                                    requestParams[i].section ===
+                                      'body' && i === index
+                                  ),
+                              ),
+                            );
+                          }}
+                        />
+                      ))}
                   </tbody>
                 </table>
               </div>
@@ -303,15 +638,53 @@ const ApiTable: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {[
-                      { key: 'Content-Type', value: 'application/json', desc: 'Media type of the resource' },
-                      { key: 'Authorization', value: 'Bearer {{token}}', desc: 'Authentication token' },
-                      { key: 'x-mock-key', value: 'mk_live_8821_99x2z', desc: 'Platform identification key' }
-                    ].map((row, i) => (
-                      <tr key={i} className="hover:bg-slate-50/50">
-                        <td className="px-3 py-1.5 font-mono text-slate-900">{row.key}</td>
-                        <td className="px-3 py-1.5 font-mono text-slate-600">{row.value}</td>
-                        <td className="px-3 py-1.5 text-slate-400 italic">{row.desc}</td>
+                    {requestHeaders.map((row, index) => (
+                      <tr key={index} className="hover:bg-slate-50/50">
+                        <td className="px-3 py-1.5 font-mono text-slate-900">
+                          <input
+                            type="text"
+                            value={row.key}
+                            onChange={(e) => {
+                              const list = [...requestHeaders];
+                              list[index] = {
+                                ...row,
+                                key: e.target.value,
+                              };
+                              setRequestHeaders(list);
+                            }}
+                            className="w-full bg-transparent outline-none text-xs"
+                          />
+                        </td>
+                        <td className="px-3 py-1.5 font-mono text-slate-600">
+                          <input
+                            type="text"
+                            value={row.value}
+                            onChange={(e) => {
+                              const list = [...requestHeaders];
+                              list[index] = {
+                                ...row,
+                                value: e.target.value,
+                              };
+                              setRequestHeaders(list);
+                            }}
+                            className="w-full bg-transparent outline-none text-xs"
+                          />
+                        </td>
+                        <td className="px-3 py-1.5 text-slate-400 italic">
+                          <input
+                            type="text"
+                            value={row.desc || ''}
+                            onChange={(e) => {
+                              const list = [...requestHeaders];
+                              list[index] = {
+                                ...row,
+                                desc: e.target.value,
+                              };
+                              setRequestHeaders(list);
+                            }}
+                            className="w-full bg-transparent outline-none text-xs"
+                          />
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -340,14 +713,35 @@ const ApiTable: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {[
-                      { key: 'Content-Type', value: 'application/json; charset=utf-8' },
-                      { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
-                      { key: 'x-powered-by', value: 'MockDev-Engine/1.0' }
-                    ].map((row, i) => (
-                      <tr key={i} className="hover:bg-slate-50/50">
-                        <td className="px-3 py-1.5 font-mono text-slate-900">{row.key}</td>
-                        <td className="px-3 py-1.5 font-mono text-slate-600">{row.value}</td>
+                    {responseHeaders.map((row, index) => (
+                      <tr key={index} className="hover:bg-slate-50/50">
+                        <td className="px-3 py-1.5 font-mono text-slate-900">
+                          <input
+                            type="text"
+                            value={row.key}
+                            onChange={(e) => {
+                              const list = [...responseHeaders];
+                              list[index] = { ...row, key: e.target.value };
+                              setResponseHeaders(list);
+                            }}
+                            className="w-full bg-transparent outline-none text-xs"
+                          />
+                        </td>
+                        <td className="px-3 py-1.5 font-mono text-slate-600">
+                          <input
+                            type="text"
+                            value={row.value}
+                            onChange={(e) => {
+                              const list = [...responseHeaders];
+                              list[index] = {
+                                ...row,
+                                value: e.target.value,
+                              };
+                              setResponseHeaders(list);
+                            }}
+                            className="w-full bg-transparent outline-none text-xs"
+                          />
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -384,10 +778,23 @@ const ApiTable: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    <SchemaRow name="status" type="string" required={true} desc="Response status" />
-                    <SchemaRow name="data" type="object" required={true} desc="Payload" />
-                    <SchemaRow name="id" type="string" required={true} desc="User ID" depth={1} />
-                    <SchemaRow name="name" type="string" required={true} desc="User Name" depth={1} />
+                    {responseSchema.map((row, index) => (
+                      <SchemaRow
+                        key={index}
+                        row={row}
+                        index={index}
+                        onChange={(next) => {
+                          const list = [...responseSchema];
+                          list[index] = next;
+                          setResponseSchema(list);
+                        }}
+                        onDelete={() => {
+                          setResponseSchema(
+                            responseSchema.filter((_, i) => i !== index),
+                          );
+                        }}
+                      />
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -416,7 +823,7 @@ const ApiTable: React.FC = () => {
               </div>
               
               {responseMode === 'proxy' && (
-                <div className="flex items中心 gap-2 text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-100">
+                <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-100">
                   <AlertCircle size={14} />
                   <span className="text-[10px] font-bold uppercase tracking-wider">
                     {t('mockProxyBadge')}
@@ -459,15 +866,12 @@ const ApiTable: React.FC = () => {
                     <button className="p-1.5 text-slate-400 hover:text-blue-600 bg-slate-50 rounded border border-slate-200"><Braces size={12} /></button>
                   </div>
                 </div>
-                <pre className="w-full h-80 bg-slate-900 rounded-2xl p-4 text-emerald-300 font-mono text-[11px] overflow-auto leading-relaxed border border-slate-800 shadow-inner">
-                  {JSON.stringify({
-                    status: "success",
-                    data: {
-                      id: "user_9921",
-                      name: "John Doe"
-                    }
-                  }, null, 2)}
-                </pre>
+                <textarea
+                  spellCheck={false}
+                  className="w-full h-80 bg-slate-900 rounded-2xl p-4 text-emerald-300 font-mono text-[11px] overflow-auto leading-relaxed border border-slate-800 shadow-inner focus:outline-none"
+                  value={mockStaticBody}
+                  onChange={(e) => setMockStaticBody(e.target.value)}
+                />
               </div>
             ) : (
               <div className="space-y-3">
@@ -490,35 +894,12 @@ const ApiTable: React.FC = () => {
                       <Save size={12} />
                     </button>
                   </div>
-                  <pre className="w-full h-96 bg-slate-900 rounded-2xl p-4 text-blue-200 font-mono text-xs overflow-auto leading-relaxed border border-slate-800 shadow-inner">
-{`/**
- * @param {Request} req - Incoming request
- * @param {Response} res - Response helper
- */
-export default function(req, res) {
-  const { id } = req.query;
-  
-  // Logic based on input
-  if (id === 'test') {
-    return res.status(200).json({
-      mode: "test_active",
-      mocked: true
-    });
-  }
-
-  // Simulate network latency
-  res.delay(200);
-
-  return res.json({
-    id: id || "anon_0",
-    timestamp: Date.now(),
-    data: {
-      status: "online",
-      version: "v2"
-    }
-  });
-}`}
-                  </pre>
+                  <textarea
+                    spellCheck={false}
+                    className="w-full h-96 bg-slate-900 rounded-2xl p-4 text-blue-200 font-mono text-xs overflow-auto leading-relaxed border border-slate-800 shadow-inner focus:outline-none"
+                    value={mockScript}
+                    onChange={(e) => setMockScript(e.target.value)}
+                  />
                 </div>
               </div>
             )}
@@ -529,8 +910,26 @@ export default function(req, res) {
     }
   };
 
+  if (!projectId) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-slate-500">
+        <Code2 size={48} className="text-slate-200 mb-4" />
+        <p className="font-semibold text-slate-700">{t('apisNoProject')}</p>
+        <p className="text-sm mt-1">{t('apisSelectProject')}</p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20 text-slate-500">
+        <span className="text-sm">{t('apisLoading')}</span>
+      </div>
+    );
+  }
+
   return (
-        <div className="flex h-[calc(100vh-160px)] -m-6 bg-white border-t border-slate-200">
+        <div className="flex h-[calc(100vh-80px)] -m-6 bg-white border-t border-slate-200">
       {/* Left Sidebar: API List */}
       <div className="w-64 border-r border-slate-200 flex flex-col bg-slate-50/50">
         <div className="p-2 border-b border-slate-200 bg-white space-y-2">
@@ -566,7 +965,11 @@ export default function(req, res) {
               className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             />
           </div>
-          <button className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors shadow-sm">
+          <button
+            type="button"
+            onClick={() => setShowNewForm(true)}
+            className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors shadow-sm cursor-pointer"
+          >
             <Plus size={14} />
             {t('interfacesNew')}
           </button>
@@ -575,7 +978,7 @@ export default function(req, res) {
         <div className="flex-1 overflow-y-auto">
           {viewMode === 'list' || searchQuery ? (
             <div className="divide-y divide-slate-100">
-              {MOCK_APIS.filter(api => api.name.toLowerCase().includes(searchQuery.toLowerCase()) || api.path.toLowerCase().includes(searchQuery.toLowerCase())).map((api) => (
+              {apis.filter(api => api.name.toLowerCase().includes(searchQuery.toLowerCase()) || api.path.toLowerCase().includes(searchQuery.toLowerCase())).map((api) => (
                 <button
                   key={api.id}
                   onClick={() => setSelectedApiId(api.id)}
@@ -591,7 +994,7 @@ export default function(req, res) {
                     }`}>
                       {api.method}
                     </span>
-                    <span className="text-[10px] text-slate-400 font-medium">{api.lastCall}</span>
+                    <span className="text-[10px] text-slate-400 font-medium">{api.lastCall || t('lastCallNever')}</span>
                   </div>
                   <div className="font-bold text-slate-900 text-xs truncate">{api.name}</div>
                   <div className="text-[9px] text-slate-400 font-mono truncate">{api.path}</div>
@@ -600,7 +1003,14 @@ export default function(req, res) {
             </div>
           ) : (
             <div className="py-1">
-              {renderTree(buildApiTree(MOCK_APIS))}
+              {apis.length === 0 ? (
+                <div className="p-3 text-center text-slate-400 text-xs">
+                  <p className="font-medium">{t('apisEmpty')}</p>
+                  <p className="mt-1">{t('apisEmptyHint')}</p>
+                </div>
+              ) : (
+                renderTree(buildApiTree(apis))
+              )}
             </div>
           )}
         </div>
@@ -608,6 +1018,62 @@ export default function(req, res) {
 
       {/* Right Content: Detail & Editor */}
       <div className="flex-1 flex flex-col bg-white overflow-hidden">
+        {showNewForm && (
+          <div className="border-b border-slate-200 px-4 py-3 flex items-center justify-between bg-slate-50/80">
+            <div className="flex items-center gap-3 flex-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                {t('apiNewTitle')}
+              </span>
+              <div className="flex items-center gap-2 flex-1">
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder={t('apiNewName')}
+                  className="flex-1 px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                />
+                <input
+                  type="text"
+                  value={newPath}
+                  onChange={(e) => setNewPath(e.target.value)}
+                  placeholder={t('apiNewPath')}
+                  className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-mono min-w-[140px]"
+                />
+                <SelectableInput
+                  options={['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']}
+                  value={newMethod}
+                  onChange={(val) => setNewMethod(val as ApiItem['method'])}
+                  allowCustom={false}
+                  showSearch={false}
+                  size="sm"
+                  inputClassName="text-[10px]"
+                  className="w-24"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2 ml-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNewForm(false);
+                  setNewName('');
+                  setNewPath('/api/v1');
+                  setNewMethod('GET');
+                }}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-600 hover:bg-slate-50 cursor-pointer"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleCreate}
+                className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 shadow-sm cursor-pointer"
+              >
+                {t('apiCreate')}
+              </button>
+            </div>
+          </div>
+        )}
         {selectedApi ? (
           <>
             {/* Detail Header */}
@@ -623,15 +1089,24 @@ export default function(req, res) {
                 </div>
               </div>
               <div className="flex items-center gap-1.5">
-                <button className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                >
                   <Trash2 size={16} />
                 </button>
-                <button className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors">
+                <button className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer">
                   <Settings2 size={16} />
                 </button>
-                <button className="flex items-center gap-2 bg-blue-600 text白 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/10">
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/10 disabled:opacity-60 cursor-pointer"
+                >
                   <Save size={14} />
-                  {t('interfaceSaveChanges')}
+                  {saving ? (t('apisLoading') as string) : t('interfaceSaveChanges')}
                 </button>
               </div>
             </div>

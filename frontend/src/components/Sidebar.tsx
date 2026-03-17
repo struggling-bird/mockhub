@@ -22,7 +22,7 @@ const Sidebar: React.FC<SidebarProps> = () => {
 
   const menuItems = [
     { id: 'dashboard', label: t('dashboard'), icon: LayoutDashboard, path: '/' },
-    { id: 'apis', label: t('apis'), icon: Code2, path: '/apis' },
+    { id: 'apis', label: t('apis'), icon: Code2, path: '/interfaces' },
     { id: 'proxies', label: t('proxies'), icon: Globe, path: '/proxies' },
     { id: 'assets', label: t('assets'), icon: Database, path: '/assets' },
     { id: 'stats', label: t('stats'), icon: Activity, path: '/stats' },
