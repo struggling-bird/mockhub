@@ -30,6 +30,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
   onDelete,
   onCopyMockKey,
 }) => {
+  const derivedMockKey = project.mockKey || `mk_${project.id.slice(0, 8)}`;
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm hover:shadow-md transition-all group flex flex-col relative">
       <div className="flex items-center justify-between mb-2">
@@ -102,7 +103,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
           <div className="flex items-center gap-1.5 overflow-hidden">
             <Key size={10} className="text-slate-400 shrink-0" />
             <code className="text-[8px] font-mono text-slate-500 truncate">
-              mk_live_placeholder
+              {derivedMockKey}
             </code>
           </div>
           <button
@@ -130,6 +131,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
           onClick={() => {
             window.localStorage.setItem('mockhub_project_id', project.id);
             window.localStorage.setItem('mockhub_project_name', project.name);
+            window.localStorage.setItem('mockhub_project_mockKey', derivedMockKey);
           }}
         >
           {t('projectsEnter')}

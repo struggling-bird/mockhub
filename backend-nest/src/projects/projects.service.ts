@@ -40,18 +40,23 @@ export class ProjectsService {
         description: p.description,
         createdAt: p.createdAt.toISOString(),
         logoUrl: p.logoUrl ?? null,
+        mockKey: p.mockKey,
       })),
       '获取项目列表成功',
     );
   }
 
   async create(ownerId: string, dto: CreateProjectDto) {
+    const mockKey = `mk_${Math.random().toString(36).slice(2, 10)}${Date.now()
+      .toString(36)
+      .slice(-4)}`;
     const project = await this.prisma.project.create({
       data: {
         name: dto.name,
         description: dto.description,
         logoUrl: dto.logoUrl,
         ownerId,
+        mockKey,
       },
     });
 
@@ -62,6 +67,7 @@ export class ProjectsService {
         description: project.description,
         createdAt: project.createdAt.toISOString(),
         logoUrl: project.logoUrl ?? null,
+        mockKey: project.mockKey,
       },
       '创建项目成功',
     );
@@ -80,6 +86,7 @@ export class ProjectsService {
         name: project.name,
         description: project.description,
         logoUrl: project.logoUrl ?? null,
+        mockKey: project.mockKey,
       },
       '获取项目详情成功',
     );
@@ -117,6 +124,7 @@ export class ProjectsService {
         name: updated.name,
         description: updated.description,
         logoUrl: updated.logoUrl ?? null,
+        mockKey: updated.mockKey,
       },
       '更新项目成功',
     );

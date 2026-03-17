@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, Link } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/dashboard';
 import ApiTable from './pages/api-table';
@@ -13,15 +13,16 @@ import PublicAssets from './pages/assets';
 import TeamManagement from './pages/team';
 import ProjectListPage from './pages/project';
 import ProjectFormPage from './pages/project/Form';
+import IntegrationGuidePage from './pages/integration';
 import Auth from './pages/auth';
-import { Bell, ChevronDown } from 'lucide-react';
+import { Bell, ChevronDown, BookOpen } from 'lucide-react';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { request, ApiError } from './utils/http';
 
 function AppContent() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
-  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [projects, setProjects] = useState<{ id: string; name: string; mockKey?: string | null }[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(
     () => window.localStorage.getItem('mockhub_project_id'),
   );
@@ -52,14 +53,17 @@ function AppContent() {
     if (!isAuthenticated) return;
     (async () => {
       try {
-        const data = await request<{ id: string; name: string }[]>(
+        const data = await request<{ id: string; name: string; mockKey?: string | null }[]>(
           '/api/projects',
         );
         setProjects(data);
         if (!currentProjectId && data.length > 0) {
-          setCurrentProjectId(data[0].id);
-          window.localStorage.setItem('mockhub_project_id', data[0].id);
-          window.localStorage.setItem('mockhub_project_name', data[0].name);
+          const first = data[0];
+          const derivedMockKey = first.mockKey || `mk_${first.id.slice(0, 8)}`;
+          setCurrentProjectId(first.id);
+          window.localStorage.setItem('mockhub_project_id', first.id);
+          window.localStorage.setItem('mockhub_project_name', first.name);
+          window.localStorage.setItem('mockhub_project_mockKey', derivedMockKey);
         }
       } catch {
         // 忽略错误
@@ -113,40 +117,53 @@ function AppContent() {
           <div className="flex items-center gap-4">
             <h1 className="text-xl font-bold text-slate-900">{getViewTitle()}</h1>
             <div className="h-4 w-px bg-slate-200 mx-2" />
-            <div className="relative">
-              <button
-                className="flex items-center gap-2 text-xs font-medium text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-100 cursor-pointer"
-                onClick={() => setProjectPickerOpen((o) => !o)}
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <button
+                  className="flex items-center gap-2 text-xs font-medium text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-100 cursor-pointer"
+                  onClick={() => setProjectPickerOpen((o) => !o)}
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  {t('projects')}:{' '}
+                  <span className="text-slate-900">
+                    {projects.find((p) => p.id === currentProjectId)?.name ||
+                      window.localStorage.getItem('mockhub_project_name') ||
+                      '—'}
+                  </span>
+                  <ChevronDown size={12} />
+                </button>
+                {projectPickerOpen && projects.length > 0 && (
+                  <div className="absolute left-0 mt-1 w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-10">
+                    {projects.map((p) => {
+                      const derivedMockKey = p.mockKey || `mk_${p.id.slice(0, 8)}`;
+                      return (
+                        <button
+                          key={p.id}
+                          className={`w-full px-3 py-1.5 text-xs text-left hover:bg-slate-50 ${
+                            p.id === currentProjectId ? 'text-blue-600 font-semibold' : 'text-slate-600'
+                          }`}
+                          onClick={() => {
+                            setCurrentProjectId(p.id);
+                            window.localStorage.setItem('mockhub_project_id', p.id);
+                            window.localStorage.setItem('mockhub_project_name', p.name);
+                            window.localStorage.setItem('mockhub_project_mockKey', derivedMockKey);
+                            setProjectPickerOpen(false);
+                          }}
+                        >
+                          {p.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <Link
+                to="/integration"
+                className="inline-flex items-center gap-1.5 text-[11px] font-medium text-blue-600 bg-blue-50/70 hover:bg-blue-100 rounded-lg px-2.5 py-1 border border-blue-100 cursor-pointer"
               >
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                {t('projects')}:{' '}
-                <span className="text-slate-900">
-                  {projects.find((p) => p.id === currentProjectId)?.name ||
-                    window.localStorage.getItem('mockhub_project_name') ||
-                    '—'}
-                </span>
-                <ChevronDown size={12} />
-              </button>
-              {projectPickerOpen && projects.length > 0 && (
-                <div className="absolute left-0 mt-1 w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-10">
-                  {projects.map((p) => (
-                    <button
-                      key={p.id}
-                      className={`w-full px-3 py-1.5 text-xs text-left hover:bg-slate-50 ${
-                        p.id === currentProjectId ? 'text-blue-600 font-semibold' : 'text-slate-600'
-                      }`}
-                      onClick={() => {
-                        setCurrentProjectId(p.id);
-                        window.localStorage.setItem('mockhub_project_id', p.id);
-                        window.localStorage.setItem('mockhub_project_name', p.name);
-                        setProjectPickerOpen(false);
-                      }}
-                    >
-                      {p.name}
-                    </button>
-                  ))}
-                </div>
-              )}
+                <BookOpen size={12} />
+                {t('integrationGuideTitle')}
+              </Link>
             </div>
           </div>
 
@@ -198,6 +215,7 @@ function AppContent() {
               <Route path="/proxies" element={<ProxyConfig />} />
               <Route path="/assets" element={<PublicAssets />} />
               <Route path="/team" element={<TeamManagement />} />
+              <Route path="/integration" element={<IntegrationGuidePage />} />
               <Route
                 path="*"
                 element={

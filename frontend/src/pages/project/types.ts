@@ -4,6 +4,7 @@ export interface ProjectItem {
   description: string | null;
   createdAt: string;
   logoUrl?: string | null;
+  mockKey?: string | null;
 }
 
 export interface ProjectFormData {

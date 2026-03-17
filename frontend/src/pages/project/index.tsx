@@ -59,7 +59,9 @@ const ProjectListPage: React.FC = () => {
             onToggleMenu={() =>
               setMenuOpenId((prev) => (prev === project.id ? null : project.id))
             }
-            onCopyMockKey={() => copyToClipboard('mk_live_placeholder')}
+            onCopyMockKey={() =>
+              copyToClipboard(project.mockKey || `mk_${project.id.slice(0, 8)}`)
+            }
             onRename={async () => {
               const name = window.prompt(t('projectRenamePrompt'), project.name);
               if (!name || name === project.name) {

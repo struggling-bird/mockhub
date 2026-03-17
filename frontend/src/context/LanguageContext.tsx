@@ -142,6 +142,38 @@ export const translations: Translations = {
     zh: '在此维护枚举、基础 URL 和共享 Schema，保证所有 Mock 接口的一致性。',
   },
 
+  // Integration guide
+  integrationGuideTitle: { en: 'Integration Guide', zh: '接入引导' },
+  integrationGuideDesc: {
+    en: 'Connect your frontend project to MockDev by pointing your HTTP client to the mock gateway and adding the mock key header.',
+    zh: '通过将前端项目的接口请求指向 Mock 网关，并在请求头中添加 Mock 密钥，即可完成接入。',
+  },
+  integrationCurrentProject: { en: 'Current Project', zh: '当前项目' },
+  integrationMockBaseUrl: { en: 'Mock Gateway Base URL', zh: 'Mock 网关基础地址' },
+  integrationMockKeyHeader: {
+    en: 'Send this key in the "x-mock-key" header for every request.',
+    zh: '在每一次请求的 "x-mock-key" 请求头中携带该密钥。',
+  },
+  integrationHowItWorksTitle: { en: 'How it works', zh: '工作原理' },
+  integrationHowItWorksStep1: {
+    en: 'Your frontend sends all API requests to the MockDev gateway instead of the real backend.',
+    zh: '你的前端将所有接口请求发送到 MockDev 网关，而不是直接请求真实后端。',
+  },
+  integrationHowItWorksStep2: {
+    en: 'MockDev identifies the project by the mock key and decides whether to mock or proxy the request.',
+    zh: 'MockDev 通过 Mock 密钥识别项目，再根据配置决定是返回 Mock 数据还是转发真实请求。',
+  },
+  integrationHowItWorksStep3: {
+    en: 'You can control the behavior per endpoint in the console (static mock / script / real proxy).',
+    zh: '你可以在控制台为每个接口配置静态 Mock、脚本 Mock 或真实代理。',
+  },
+  integrationCodeExamplesTitle: { en: 'Code examples', zh: '接入示例' },
+  integrationAxiosTitle: { en: 'Axios (React / Vue)', zh: 'Axios（React / Vue 通用）' },
+  integrationFetchTitle: { en: 'Native fetch', zh: '原生 fetch' },
+  integrationViteTitle: { en: 'Vite dev proxy', zh: 'Vite 本地开发代理' },
+  integrationNextTitle: { en: 'Next.js middleware', zh: 'Next.js 中间件接入' },
+  integrationCopySnippet: { en: 'Copy snippet', zh: '复制示例代码' },
+
   // Selectable input
   selectableSearchPlaceholder: { en: 'Search...', zh: '搜索...' },
   selectableNoMatch: { en: 'No matches found.', zh: '未找到匹配项。' },

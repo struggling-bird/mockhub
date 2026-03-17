@@ -32,6 +32,12 @@ export class ProjectSummaryDto {
     required: false,
   })
   logoUrl?: string | null;
+
+  @ApiProperty({
+    description: '项目唯一 Mock 密钥，用于通过 Header x-mock-key 标识项目',
+    example: 'mk_live_1a2b3c4d',
+  })
+  mockKey: string;
 }
 
 export class ProjectDetailDto {
@@ -60,5 +66,11 @@ export class ProjectDetailDto {
     required: false,
   })
   logoUrl?: string | null;
+
+  @ApiProperty({
+    description: '项目唯一 Mock 密钥，用于通过 Header x-mock-key 标识项目',
+    example: 'mk_live_1a2b3c4d',
+  })
+  mockKey: string;
 }
 

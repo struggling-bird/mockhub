@@ -22,6 +22,7 @@ model Project {
   name        String
   description String?
   logoUrl     String?     @map("logo_url")
+  mockKey     String      @unique @map("mock_key")
   ownerId     String      @map("owner_id")
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")
