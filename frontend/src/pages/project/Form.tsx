@@ -20,6 +20,9 @@ const ProjectFormPage: React.FC = () => {
     members: '1',
     logo: '',
     defaultMockMode: 'static',
+    autoCapture: false,
+    cookieRewriteMode: 'off',
+    cookieRewriteDomain: '',
   });
   const [uploading, setUploading] = useState(false);
   const initialLogoRef = useRef('');
@@ -51,6 +54,9 @@ const ProjectFormPage: React.FC = () => {
           logoUrl?: string | null;
           proxyUrl?: string | null;
           defaultMockMode?: 'static' | 'script' | 'proxy';
+          autoCapture?: boolean;
+          cookieRewriteMode?: 'off' | 'origin' | 'custom';
+          cookieRewriteDomain?: string | null;
         }>(`/api/projects/${id}`);
         setFormData((prev) => ({
           ...prev,
@@ -59,6 +65,9 @@ const ProjectFormPage: React.FC = () => {
           logo: data.logoUrl || '',
           proxyUrl: data.proxyUrl || '',
           defaultMockMode: data.defaultMockMode || 'static',
+          autoCapture: data.autoCapture ?? false,
+          cookieRewriteMode: data.cookieRewriteMode ?? 'off',
+          cookieRewriteDomain: data.cookieRewriteDomain ?? '',
         }));
         initialLogoRef.current = data.logoUrl || '';
         tempLogoRef.current = null;
@@ -111,6 +120,12 @@ const ProjectFormPage: React.FC = () => {
           logoUrl: formData.logo || undefined,
           proxyUrl: formData.proxyUrl,
           defaultMockMode: formData.defaultMockMode,
+          autoCapture: formData.autoCapture,
+          cookieRewriteMode: formData.cookieRewriteMode,
+          cookieRewriteDomain:
+            formData.cookieRewriteMode === 'custom'
+              ? formData.cookieRewriteDomain.trim() || null
+              : null,
         }),
       });
       skipCleanupRef.current = true;

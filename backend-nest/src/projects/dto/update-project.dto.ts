@@ -31,5 +31,25 @@ export class UpdateProjectDto {
     example: 'static',
   })
   defaultMockMode?: string;
+
+  @ApiPropertyOptional({
+    description: '是否开启代理自动学习更新，未传则保持原值',
+    example: true,
+  })
+  autoCapture?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Set-Cookie 的 Domain 重写策略：off-不处理，origin-重写为当前访问域名，custom-重写为自定义域名，未传则保持原值',
+    enum: ['off', 'origin', 'custom'],
+    example: 'origin',
+  })
+  cookieRewriteMode?: string;
+
+  @ApiPropertyOptional({
+    description: '当 cookieRewriteMode=custom 时，重写 Domain 的目标域名，未传则保持原值',
+    example: 'localhost',
+  })
+  cookieRewriteDomain?: string | null;
 }
 

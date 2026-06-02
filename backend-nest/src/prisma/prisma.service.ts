@@ -17,11 +17,8 @@ const dbConfig = {
   user: dbUser,
   password: dbPass,
   database: dbName,
+  allowPublicKeyRetrieval: true,
 };
-
-const databaseUrl =
-  process.env.DATABASE_URL ??
-  `mysql://${dbUser}:${encodeURIComponent(dbPass)}@${dbHost}:${dbPort}/${dbName}`;
 
 @Injectable()
 export class PrismaService
@@ -29,7 +26,7 @@ export class PrismaService
   implements OnModuleInit, OnModuleDestroy
 {
   constructor() {
-    const adapter = new PrismaMariaDb(databaseUrl);
+    const adapter = new PrismaMariaDb(dbConfig);
     super({ adapter });
   }
 
@@ -42,4 +39,3 @@ export class PrismaService
     await this.$disconnect();
   }
 }
-

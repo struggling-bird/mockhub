@@ -128,6 +128,21 @@ export const translations: Translations = {
   projectDefaultStrategyScript: { en: 'Dynamic Mock Script', zh: '动态 Mock 脚本' },
   projectDefaultStrategyProxy: { en: 'Real Service Proxy', zh: '真实服务代理' },
 
+  enabled: { en: 'Enabled', zh: '已开启' },
+  disabled: { en: 'Disabled', zh: '已关闭' },
+
+  projectAutoCapture: { en: 'Auto Capture (Learning)', zh: '自动学习更新' },
+  projectAutoCaptureHint: {
+    en: 'Update endpoint docs from real traffic',
+    zh: '基于真实流量更新接口文档/Mock',
+  },
+  cookieRewrite: { en: 'Cookie Domain Rewrite', zh: 'Cookie 域名重写' },
+  cookieRewriteOff: { en: 'Off', zh: '关闭（不处理）' },
+  cookieRewriteOrigin: { en: 'Rewrite to current origin', zh: '重写为当前访问域名' },
+  cookieRewriteCustom: { en: 'Rewrite to custom domain', zh: '重写为自定义域名' },
+  cookieRewriteDomain: { en: 'Custom cookie domain', zh: '自定义 Cookie 域名' },
+  cookieRewriteDomainPlaceholder: { en: 'e.g. localhost', zh: '例如：localhost' },
+
   // Public Assets
   publicAssetsTitle: { en: 'Public Assets', zh: '公共资产' },
   publicAssetsDesc: {

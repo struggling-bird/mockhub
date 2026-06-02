@@ -19,7 +19,7 @@ const IntegrationGuidePage: React.FC = () => {
     typeof window !== 'undefined'
       ? window.location.origin.replace(/\/$/, '')
       : 'https://mock.example.com';
-  const mockGatewayUrl = `${baseOrigin}/gateway/${mockKey}`;
+  const mockGatewayUrl = `${baseOrigin}/gateway`;
   const [activeTab, setActiveTab] = useState<'axios' | 'fetch' | 'vite' | 'next'>('axios');
 
   const axiosSnippet = useMemo(

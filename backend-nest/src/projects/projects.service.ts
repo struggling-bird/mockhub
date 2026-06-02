@@ -42,6 +42,10 @@ export class ProjectsService {
         logoUrl: p.logoUrl ?? null,
         proxyUrl: (p as any).proxyUrl ?? null,
         mockKey: p.mockKey,
+        defaultMockMode: (p as any).defaultMockMode ?? 'static',
+        autoCapture: (p as any).autoCapture ?? false,
+        cookieRewriteMode: (p as any).cookieRewriteMode ?? 'off',
+        cookieRewriteDomain: (p as any).cookieRewriteDomain ?? null,
       })),
       '获取项目列表成功',
     );
@@ -52,6 +56,9 @@ export class ProjectsService {
       .toString(36)
       .slice(-4)}`;
     const defaultMockMode = dto.defaultMockMode ?? 'static';
+    const autoCapture = dto.autoCapture ?? false;
+    const cookieRewriteMode = dto.cookieRewriteMode ?? 'off';
+    const cookieRewriteDomain = dto.cookieRewriteDomain ?? null;
     const project = await this.prisma.project.create({
       data: {
         name: dto.name,
@@ -61,6 +68,9 @@ export class ProjectsService {
         mockKey,
         // defaultMockMode 尚未在 Prisma Client 类型中声明，这里通过 any 绕过类型限制
         ...( { defaultMockMode } as any ),
+        ...( { autoCapture } as any ),
+        ...( { cookieRewriteMode } as any ),
+        ...( { cookieRewriteDomain } as any ),
         ...(dto.proxyUrl ? ({ proxyUrl: dto.proxyUrl } as any) : {}),
       } as any,
     });
@@ -75,6 +85,9 @@ export class ProjectsService {
         proxyUrl: (project as any).proxyUrl ?? null,
         mockKey: project.mockKey,
         defaultMockMode: (project as any).defaultMockMode ?? 'static',
+        autoCapture: (project as any).autoCapture ?? false,
+        cookieRewriteMode: (project as any).cookieRewriteMode ?? 'off',
+        cookieRewriteDomain: (project as any).cookieRewriteDomain ?? null,
       },
       '创建项目成功',
     );
@@ -96,6 +109,9 @@ export class ProjectsService {
         proxyUrl: (project as any).proxyUrl ?? null,
         mockKey: project.mockKey,
         defaultMockMode: (project as any).defaultMockMode ?? 'static',
+        autoCapture: (project as any).autoCapture ?? false,
+        cookieRewriteMode: (project as any).cookieRewriteMode ?? 'off',
+        cookieRewriteDomain: (project as any).cookieRewriteDomain ?? null,
       },
       '获取项目详情成功',
     );
@@ -125,6 +141,15 @@ export class ProjectsService {
         ...(dto.proxyUrl !== undefined
           ? ({ proxyUrl: dto.proxyUrl || null } as any)
           : {}),
+        ...(dto.autoCapture !== undefined
+          ? ({ autoCapture: dto.autoCapture } as any)
+          : {}),
+        ...(dto.cookieRewriteMode !== undefined
+          ? ({ cookieRewriteMode: dto.cookieRewriteMode } as any)
+          : {}),
+        ...(dto.cookieRewriteDomain !== undefined
+          ? ({ cookieRewriteDomain: dto.cookieRewriteDomain } as any)
+          : {}),
       } as any,
     });
 
@@ -142,6 +167,9 @@ export class ProjectsService {
         proxyUrl: (updated as any).proxyUrl ?? null,
         mockKey: updated.mockKey,
         defaultMockMode: (updated as any).defaultMockMode ?? 'static',
+        autoCapture: (updated as any).autoCapture ?? false,
+        cookieRewriteMode: (updated as any).cookieRewriteMode ?? 'off',
+        cookieRewriteDomain: (updated as any).cookieRewriteDomain ?? null,
       },
       '更新项目成功',
     );

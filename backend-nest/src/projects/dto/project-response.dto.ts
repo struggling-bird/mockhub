@@ -45,6 +45,29 @@ export class ProjectSummaryDto {
     example: 'mk_live_1a2b3c4d',
   })
   mockKey: string;
+
+  @ApiProperty({
+    description:
+      'Set-Cookie 的 Domain 重写策略：off-不处理，origin-重写为当前访问域名，custom-重写为自定义域名',
+    enum: ['off', 'origin', 'custom'],
+    example: 'origin',
+    required: false,
+  })
+  cookieRewriteMode?: string;
+
+  @ApiProperty({
+    description: '当 cookieRewriteMode=custom 时，重写 Domain 的目标域名',
+    example: 'localhost',
+    required: false,
+  })
+  cookieRewriteDomain?: string | null;
+
+  @ApiProperty({
+    description: '是否开启代理自动学习更新',
+    example: true,
+    required: false,
+  })
+  autoCapture?: boolean;
 }
 
 export class ProjectDetailDto {
@@ -87,5 +110,29 @@ export class ProjectDetailDto {
     required: false,
   })
   defaultMockMode?: string;
+
+  @ApiProperty({
+    description:
+      '是否允许在真实代理模式下自动学习并更新接口配置（请求头/参数结构/响应头/响应结构/静态 Mock），true 表示开启',
+    example: true,
+    required: false,
+  })
+  autoCapture?: boolean;
+
+  @ApiProperty({
+    description:
+      'Set-Cookie 的 Domain 重写策略：off-不处理，origin-重写为当前访问域名，custom-重写为自定义域名',
+    enum: ['off', 'origin', 'custom'],
+    example: 'origin',
+    required: false,
+  })
+  cookieRewriteMode?: string;
+
+  @ApiProperty({
+    description: '当 cookieRewriteMode=custom 时，重写 Domain 的目标域名',
+    example: 'localhost',
+    required: false,
+  })
+  cookieRewriteDomain?: string | null;
 }
 

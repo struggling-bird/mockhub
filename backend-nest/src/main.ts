@@ -4,6 +4,7 @@ import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
+import { RequestMethod } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import multipart from '@fastify/multipart';
 import { mkdir } from 'fs/promises';
@@ -26,8 +27,28 @@ async function bootstrap() {
 
   await instance.register(multipart);
 
-  app.setGlobalPrefix('api');
+  // 网关入口需要是 /gateway/*（不走 /api 前缀），其余业务接口统一使用 /api
+  app.setGlobalPrefix('api', {
+    exclude: [
+      { path: 'gateway', method: RequestMethod.ALL },
+      { path: 'gateway/(.*)', method: RequestMethod.ALL },
+    ],
+  });
   app.enableCors();
+
+  // 仅对 /gateway 路由启用 Buffer body parser，以便实现 100% 原始请求体透传
+  await instance.register(
+    async (fastify: any) => {
+      fastify.addContentTypeParser(
+        '*',
+        { parseAs: 'buffer' },
+        (_req: any, body: Buffer, done: any) => {
+          done(null, body);
+        },
+      );
+    },
+    { prefix: '/gateway' },
+  );
 
   const config = new DocumentBuilder()
     .setTitle('MockHub API')

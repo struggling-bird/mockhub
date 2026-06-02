@@ -6,6 +6,7 @@ export interface DatabaseConfig {
   user: string;
   password: string;
   database: string;
+  allowPublicKeyRetrieval?: boolean;
 }
 
 async function addColumnIfMissing(conn: mariadb.Connection, sql: string) {
@@ -57,6 +58,9 @@ export async function ensureDatabaseSchema(config: DatabaseConfig) {
         proxy_url   VARCHAR(512) NULL,
         mock_key    VARCHAR(64)  NULL UNIQUE,
         default_mock_mode VARCHAR(50) NULL,
+        auto_capture TINYINT(1) NULL,
+        cookie_rewrite_mode VARCHAR(50) NULL,
+        cookie_rewrite_domain VARCHAR(255) NULL,
         created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT fk_projects_owner
@@ -84,6 +88,18 @@ export async function ensureDatabaseSchema(config: DatabaseConfig) {
     await addColumnIfMissing(
       conn,
       'ALTER TABLE projects ADD COLUMN default_mock_mode VARCHAR(50) NULL',
+    );
+    await addColumnIfMissing(
+      conn,
+      'ALTER TABLE projects ADD COLUMN auto_capture TINYINT(1) NULL',
+    );
+    await addColumnIfMissing(
+      conn,
+      'ALTER TABLE projects ADD COLUMN cookie_rewrite_mode VARCHAR(50) NULL',
+    );
+    await addColumnIfMissing(
+      conn,
+      'ALTER TABLE projects ADD COLUMN cookie_rewrite_domain VARCHAR(255) NULL',
     );
 
     await conn.query(`
@@ -146,4 +162,3 @@ export async function ensureDatabaseSchema(config: DatabaseConfig) {
     await conn.end();
   }
 }
-

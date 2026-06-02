@@ -9,9 +9,18 @@ import { ProjectsModule } from './projects/projects.module';
 import { UploadModule } from './upload/upload.module';
 import { ApisModule } from './apis/apis.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { GatewayModule } from './gateway/gateway.module';
 
 @Module({
-  imports: [PrismaModule, RedisModule, AuthModule, ProjectsModule, UploadModule, ApisModule],
+  imports: [
+    PrismaModule,
+    RedisModule,
+    AuthModule,
+    ProjectsModule,
+    UploadModule,
+    ApisModule,
+    GatewayModule,
+  ],
   controllers: [AppController],
   providers: [
     AppService,

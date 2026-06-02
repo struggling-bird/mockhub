@@ -5,6 +5,11 @@ export interface ProjectItem {
   createdAt: string;
   logoUrl?: string | null;
   mockKey?: string | null;
+  proxyUrl?: string | null;
+  defaultMockMode?: 'static' | 'script' | 'proxy';
+  autoCapture?: boolean;
+  cookieRewriteMode?: 'off' | 'origin' | 'custom';
+  cookieRewriteDomain?: string | null;
 }
 
 export interface ProjectFormData {
@@ -13,5 +18,8 @@ export interface ProjectFormData {
   proxyUrl: string;
   members: string;
   logo: string;
-   defaultMockMode: 'static' | 'script' | 'proxy';
+  defaultMockMode: 'static' | 'script' | 'proxy';
+  autoCapture: boolean;
+  cookieRewriteMode: 'off' | 'origin' | 'custom';
+  cookieRewriteDomain: string;
 }
