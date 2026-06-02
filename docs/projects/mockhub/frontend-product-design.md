@@ -107,10 +107,10 @@ Dashboard 用于在项目层面展示 MockHub 的整体运行情况和最近活�
   - Active Proxies：活跃代理数。
   - Team：团队成员数。
   - Requests/hr：每小时请求量。
-  - 数据目前为前端 mock 值，后续应由后端统计接口提供。
+  - 数据由后端 `/api/dashboard/summary` 提供；当前 Team 在成员体系落地前按 owner-only 模型返回当前用户计数。
 - **最近活动（Recent Activity）**
-  - 列表形式展示最近的接口变更 / 调试记录（模拟数据）。
-  - 未来可对接请求日志与操作审计。
+  - 列表形式展示最近的网关请求日志，包括请求方法、路径、模式、状态码、耗时和发生时间。
+  - 当前来源为 `request_logs`，未来可继续扩展操作审计。
 - **系统状态（System Status）**
   - 展示 Proxy Engine / Mock Storage / Auth Service 等子系统的运行状况。
   - 使用颜色与标签（OPERATIONAL / LATENCY）区分健康状态。
@@ -296,4 +296,3 @@ Proxy 规则模块用于按分组管理正则路由规则和代理 / Mock 运行
    - 增加操作审计日志、变更记录、项目邀请与成员角色调整 UI。
 
 本设计文档应与后端设计文档一同维护，随产品能力演进持续更新。
-

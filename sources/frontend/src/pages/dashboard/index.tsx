@@ -1,28 +1,118 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   Users,
   Code2,
   Globe,
-  ArrowUpRight,
   Clock,
   CheckCircle2,
   AlertCircle
 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
+import { request } from '../../utils/http';
+import { formatLastCall } from '../../utils/relativeTime';
+
+interface DashboardSummary {
+  stats: {
+    totalApis: number;
+    activeProxies: number;
+    teamMembers: number;
+    requestsPerHour: number;
+  };
+  recentActivity: {
+    id: string;
+    title: string;
+    subtitle: string;
+    mode: string;
+    statusCode: number;
+    durationMs: number;
+    createdAt: string;
+  }[];
+  systemStatus: {
+    proxyEngine: string;
+    mockStorage: string;
+    authService: string;
+  };
+}
 
 const Dashboard: React.FC = () => {
   const { t } = useLanguage();
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const stats = [
-    { label: t('totalApis'), value: '42', icon: Code2, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: t('activeProxies'), value: '12', icon: Globe, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: t('team'), value: '8', icon: Users, color: 'text-purple-600', bg: 'bg-purple-50' },
-    { label: t('requestsHr'), value: '1.2k', icon: Activity, color: 'text-amber-600', bg: 'bg-amber-50' },
-  ];
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    request<DashboardSummary>('/api/dashboard/summary')
+      .then((data) => {
+        if (!cancelled) {
+          setSummary(data);
+          setError('');
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Dashboard data unavailable');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const stats = useMemo(
+    () => [
+      {
+        label: t('totalApis'),
+        value: String(summary?.stats.totalApis ?? 0),
+        icon: Code2,
+        color: 'text-blue-600',
+        bg: 'bg-blue-50',
+      },
+      {
+        label: t('activeProxies'),
+        value: String(summary?.stats.activeProxies ?? 0),
+        icon: Globe,
+        color: 'text-emerald-600',
+        bg: 'bg-emerald-50',
+      },
+      {
+        label: t('team'),
+        value: String(summary?.stats.teamMembers ?? 1),
+        icon: Users,
+        color: 'text-purple-600',
+        bg: 'bg-purple-50',
+      },
+      {
+        label: t('requestsHr'),
+        value: String(summary?.stats.requestsPerHour ?? 0),
+        icon: Activity,
+        color: 'text-amber-600',
+        bg: 'bg-amber-50',
+      },
+    ],
+    [summary, t],
+  );
+
+  const statusLabel = (status: string) =>
+    status === 'latency' ? t('statusLatency') : t('statusOperational');
+  const isLatency = (status: string) => status === 'latency';
 
   return (
     <div className="space-y-6">
+      {error ? (
+        <div className="bg-amber-50 border border-amber-200 text-amber-700 text-xs px-3 py-2 rounded-lg">
+          {error}
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, i) => (
           <div key={i} className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm">
@@ -30,8 +120,8 @@ const Dashboard: React.FC = () => {
               <div className={`p-1.5 rounded-lg ${stat.bg} ${stat.color}`}>
                 <stat.icon size={18} />
               </div>
-              <span className="text-emerald-500 text-[10px] font-bold flex items-center gap-0.5">
-                +12% <ArrowUpRight size={10} />
+              <span className="text-slate-400 text-[10px] font-bold flex items-center gap-0.5">
+                {loading ? '...' : 'LIVE'}
               </span>
             </div>
             <div className="text-xl font-bold text-slate-900">{stat.value}</div>
@@ -49,22 +139,39 @@ const Dashboard: React.FC = () => {
             </button>
           </div>
           <div className="divide-y divide-slate-100">
-            {[1, 2, 3, 4, 5].map((_, i) => (
-              <div key={i} className="p-3 flex items-center gap-3 hover:bg-slate-50 transition-colors">
-                <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
-                  <Clock size={12} />
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs text-slate-900">
-                    {t('activityExample')}
-                  </p>
-                  <p className="text-[10px] text-slate-400">{t('activityTimeAgo')}</p>
-                </div>
-                <div className="flex items-center gap-1 text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
-                  <CheckCircle2 size={9} /> SUCCESS
-                </div>
+            {(summary?.recentActivity ?? []).length === 0 ? (
+              <div className="p-6 text-xs text-slate-400">
+                {loading ? 'Loading...' : 'No recent gateway requests'}
               </div>
-            ))}
+            ) : (
+              summary?.recentActivity.map((activity) => {
+                const success = activity.statusCode < 400;
+                return (
+                  <div key={activity.id} className="p-3 flex items-center gap-3 hover:bg-slate-50 transition-colors">
+                    <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
+                      <Clock size={12} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-slate-900 truncate">{activity.title}</p>
+                      <p className="text-[10px] text-slate-400 truncate">
+                        {activity.subtitle} · {activity.mode} · {activity.durationMs}ms ·{' '}
+                        {formatLastCall(activity.createdAt)}
+                      </p>
+                    </div>
+                    <div
+                      className={`flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                        success
+                          ? 'text-emerald-600 bg-emerald-50 border-emerald-100'
+                          : 'text-rose-600 bg-rose-50 border-rose-100'
+                      }`}
+                    >
+                      {success ? <CheckCircle2 size={9} /> : <AlertCircle size={9} />}
+                      {activity.statusCode}
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
 
@@ -74,23 +181,23 @@ const Dashboard: React.FC = () => {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-slate-600">{t('statusProxyEngine')}</span>
-                <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  {t('statusOperational')}
+                <span className={`flex items-center gap-1.5 text-[10px] font-bold ${isLatency(summary?.systemStatus.proxyEngine || '') ? 'text-amber-600' : 'text-emerald-600'}`}>
+                  {isLatency(summary?.systemStatus.proxyEngine || '') ? <AlertCircle size={12} /> : <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                  {statusLabel(summary?.systemStatus.proxyEngine || 'operational')}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-slate-600">{t('statusMockStorage')}</span>
-                <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  {t('statusOperational')}
+                <span className={`flex items-center gap-1.5 text-[10px] font-bold ${isLatency(summary?.systemStatus.mockStorage || '') ? 'text-amber-600' : 'text-emerald-600'}`}>
+                  {isLatency(summary?.systemStatus.mockStorage || '') ? <AlertCircle size={12} /> : <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                  {statusLabel(summary?.systemStatus.mockStorage || 'operational')}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-slate-600">{t('statusAuthService')}</span>
-                <span className="flex items-center gap-1.5 text-[10px] font-bold text-amber-600">
-                  <AlertCircle size={12} />
-                  {t('statusLatency')}
+                <span className={`flex items-center gap-1.5 text-[10px] font-bold ${isLatency(summary?.systemStatus.authService || '') ? 'text-amber-600' : 'text-emerald-600'}`}>
+                  {isLatency(summary?.systemStatus.authService || '') ? <AlertCircle size={12} /> : <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                  {statusLabel(summary?.systemStatus.authService || 'operational')}
                 </span>
               </div>
             </div>

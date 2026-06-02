@@ -108,7 +108,7 @@
 | 节点 | 名称 | 状态 | 验收结论 |
 | --- | --- | --- | --- |
 | 节点 1 | 脚本 Mock 引擎 | 已验收 | 验收通过 |
-| 节点 2 | 请求日志与 Dashboard 数据化 | 未开始 | 未验收 |
+| 节点 2 | 请求日志与 Dashboard 数据化 | 已验收 | 验收通过 |
 | 节点 3 | 公共资产 CRUD | 未开始 | 未验收 |
 | 节点 4 | 团队成员与项目权限 | 未开始 | 未验收 |
 | 节点 5 | 代理规则分组 | 未开始 | 未验收 |
@@ -182,7 +182,7 @@
 #### 节点 2
 
 - 节点名称：请求日志与 Dashboard 数据化
-- 当前状态：`未开始`
+- 当前状态：`已验收`
 - 目标：
   - 建立最小请求日志模型。
   - 网关记录请求、响应状态、耗时、模式、接口和项目。
@@ -208,10 +208,22 @@
   - 远端分支：默认 `origin/dev` 或用户确认后的独立开发分支。
   - 下一步推荐动作：进入“公共资产 CRUD”节点。
 - 完成说明：
+- 已新增 `RequestLog` Prisma 模型和 `request_logs` schema sync，记录项目、接口、方法、路径、模式、状态码、耗时、错误信息和创建时间。
+- 已在 `GatewayService` 的 static、script、proxy、auto-capture 和部分配置错误路径写入请求日志；日志写入失败只打印 warn，不阻断原请求。
+- 已新增 `DashboardModule`、`DashboardController`、`DashboardService`，提供 `/api/dashboard/summary`。
+- Dashboard summary 返回接口总数、活跃代理数、owner-only 团队计数、最近一小时请求数、最近 5 条网关活动和系统状态。
+- 前端 Dashboard 已从固定 mock 数值改为调用 `/api/dashboard/summary`，并提供 loading、error、empty 和真实最近活动展示。
+- 已同步 `docs/projects/mockhub/source-map.md` 与 `docs/projects/mockhub/frontend-product-design.md`。
 - 验证结果：
+- `cd sources/backend-nest && npm test -- --runInBand gateway.body.spec.ts script-mock.service.spec.ts`：通过，2 个测试套件、10 个测试全部通过。
+- `cd sources/backend-nest && npx nest build`：通过。
+- `cd sources/frontend && npm run build`：通过。
 - 遗留事项：
-- 用户验收结论：
-- 用户验收时间：
+- 当前 Team 指标在团队成员体系未落地前按 owner-only 模型返回 `1`。
+- 当前系统状态为后端静态健康枚举，尚未接入真实 Redis/DB/服务健康探测。
+- 未做基于真实数据库数据的浏览器端联调截图验证；当前完成判断基于构建、单测和代码路径验证。
+- 用户验收结论：用户回复“验收通过”，确认节点 2 请求日志与 Dashboard 数据化通过验收。
+- 用户验收时间：2026-06-02 18:17:50 CST
 
 #### 节点 3
 

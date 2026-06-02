@@ -10,6 +10,7 @@ import { UploadModule } from './upload/upload.module';
 import { ApisModule } from './apis/apis.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { GatewayModule } from './gateway/gateway.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { GatewayModule } from './gateway/gateway.module';
     UploadModule,
     ApisModule,
     GatewayModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [

@@ -158,6 +158,29 @@ export async function ensureDatabaseSchema(config: DatabaseConfig) {
       conn,
       'ALTER TABLE project_apis ADD COLUMN mock_proxy_url VARCHAR(512) NULL',
     );
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS request_logs (
+        id            VARCHAR(50)  NOT NULL PRIMARY KEY,
+        project_id    VARCHAR(50)  NOT NULL,
+        api_id        VARCHAR(50)  NULL,
+        method        VARCHAR(20)  NOT NULL,
+        path          VARCHAR(512) NOT NULL,
+        mode          VARCHAR(50)  NULL,
+        status_code   INT          NOT NULL,
+        duration_ms   INT          NOT NULL,
+        error_message TEXT         NULL,
+        created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_request_logs_project_created_at (project_id, created_at),
+        INDEX idx_request_logs_api_id (api_id),
+        CONSTRAINT fk_request_logs_project
+          FOREIGN KEY (project_id) REFERENCES projects(id)
+          ON DELETE CASCADE,
+        CONSTRAINT fk_request_logs_api
+          FOREIGN KEY (api_id) REFERENCES project_apis(id)
+          ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
   } finally {
     await conn.end();
   }
