@@ -1,0 +1,15 @@
+repositories:
+  - repo_id: mockhub-backend
+    repo_name: MockHub 后端服务
+    category: backend
+    local_path: sources/backend-nest
+    default_branch: dev
+    source_of_truth: local
+    notes: NestJS + Fastify + Prisma 后端服务，提供认证、项目、接口、上传和网关能力。
+  - repo_id: mockhub-frontend
+    repo_name: MockHub 前端控制台
+    category: frontend
+    local_path: sources/frontend
+    default_branch: dev
+    source_of_truth: local
+    notes: React + Vite 前端控制台，提供项目管理、接口管理、代理规则、公共资产和团队页面。

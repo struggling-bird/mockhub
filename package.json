@@ -1,0 +1,7 @@
+{
+  "name": "mockhub-workspace",
+  "private": true,
+  "scripts": {
+    "dev": "bash scripts/dev.sh"
+  }
+}

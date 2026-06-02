@@ -1,0 +1,34 @@
+workspace:
+  id: mockhub
+  name: MockHub 工作空间
+  adoption_mode: legacy-adoption
+  source_strategy: in-repository-sources
+  last_structure_update_at: 2026-06-02
+  local_customization_notes:
+    - 当前工作空间管理 MockHub 前后端源码、项目文档、流程 skill 与任务闭环资产。
+    - sources 目录中的源码由当前 Git 仓库继续跟踪，不使用忽略隔离规则。
+
+applied_capabilities:
+  - id: workflow-skills
+    status: applied
+    summary: 工作空间级 workflow skill 分层、路由与必备章节规范。
+  - id: workflow-validation
+    status: applied
+    summary: 工作空间校验覆盖流程 skill、文档入口、源码映射与 MockHub 项目资料。
+  - id: legacy-ai-collaboration-adoption
+    status: applied
+    summary: 当前存量工程已整理为 harness 工作空间，源码位于 sources 目录。
+  - id: implementation-plan-confirmation-gate
+    status: applied
+    summary: 实施计划必须经用户确认后才能进入实施阶段。
+  - id: node-level-version-maintenance-gate
+    status: applied
+    summary: 节点验收后先完成适用范围内的提交与推送，再进入下一节点。
+
+governance_policy:
+  require_solution_confirmation: true
+  require_task_plan: true
+  require_implementation_plan_confirmation: true
+  require_node_acceptance: true
+  protect_local_customization: true
+  require_change_history: true
