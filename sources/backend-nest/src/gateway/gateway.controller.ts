@@ -1,4 +1,4 @@
-import { All, Controller, Req, Res } from '@nestjs/common';
+import { All, Controller, Logger, Req, Res } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { Public } from '../auth/public.decorator';
 import { GatewayService } from './gateway.service';
@@ -6,10 +6,17 @@ import { GatewayService } from './gateway.service';
 @Public()
 @Controller('gateway')
 export class GatewayController {
+  private readonly logger = new Logger(GatewayController.name);
+
   constructor(private readonly gatewayService: GatewayService) {}
 
   @All('*')
   async handle(@Req() req: FastifyRequest, @Res() reply: FastifyReply) {
+    this.logger.log(
+      `[GatewayController] matched ${req.method} ${req.url} mockKey=${
+        req.headers['x-mock-key'] ? 'present' : 'missing'
+      }`,
+    );
     const result = await this.gatewayService.handleGateway(req);
 
     if (result.kind === 'static') {
@@ -28,4 +35,3 @@ export class GatewayController {
     return reply.send(proxy.body);
   }
 }
-

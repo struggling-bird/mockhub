@@ -69,7 +69,7 @@
 - **脚本执行引擎**
   - Node 自身运行时 + `vm` 模块（沙箱执行）：
     - `vm.Script` + `vm.createContext`，限制访问的全局变量；
-    - 通过超时与内存限制保护主进程。
+    - 通过同步执行超时保护主进程，当前不暴露 `require`、`process` 等对象。
   - 如果未来对安全/性能要求更高，可考虑：
     - `isolated-vm`（独立隔离的 V8 虚拟机）；
     - 使用外部 Worker 进程执行脚本，主进程通过 IPC 通信。
@@ -321,7 +321,7 @@ fastify.all('/gateway/:projectKey/*', async (req, reply) => {
 
 ### 5.4 脚本执行模块（ScriptModule）
 
-使用 Node `vm` 模块提供简单沙箱：
+当前实现位于 `sources/backend-nest/src/gateway/script-mock.service.ts`，使用 Node `vm` 模块提供简单沙箱，并由 `GatewayService` 的 `script` 模式分支调用。
 
 - 暴露给脚本的对象：
 
@@ -346,12 +346,25 @@ const sandbox = {
 };
 ```
 
+- 支持脚本格式：
+  - `export default function(req, res) { ... }`
+  - `module.exports = function(req, res) { ... }`
+  - 未显式导出的内联脚本会被包装为 `function(request, response) { ... }`
+- 响应辅助方法：
+  - `response.status(code)`
+  - `response.setHeader(key, value)` / `response.header(key, value)`
+  - `response.json(body)`
+  - `response.text(body)`
+  - `response.body(body)`
+  - `response.delay(ms)`，最大延迟 5000ms。
 - 执行过程：
-  1. 使用 `vm.Script(scriptCode)` 编译脚本；
-  2. 设定 `timeout` 与 `microtaskMode` 保护执行时间与事件循环；
-  3. 脚本执行后，从 `response` 对象中读取状态码、头和 body 返回。
+  1. 规范化脚本格式并创建受限 sandbox；
+  2. 使用 `vm.Script` 在 sandbox 内加载并调用脚本函数；
+  3. 设定 500ms 同步执行超时；
+  4. 脚本执行后，从 response state 读取状态码、headers 和 body 返回；
+  5. 对象返回默认按 JSON 输出，字符串返回默认按 text 输出。
 
-> 重要：严禁将 `require`、`process` 等对象暴露到 sandbox 中，避免突破沙箱。
+> 重要：当前脚本沙箱适合 Mock 场景的轻量动态响应，不应执行高风险、不可信或需要强隔离的生产级代码；如后续安全要求提高，应升级到 `isolated-vm` 或独立 Worker 进程。
 
 ---
 
@@ -444,4 +457,3 @@ CMD ["node", "dist/main.js"]
 - 支持多 region、多实例部署下的配置一致性（通过数据库或配置中心）。
 
 本 Node.js 后端技术方案与 `backend-design.md` 中的 Go 方案在领域层面保持一致，仅在实现技术与运行时上做了适配，方便团队按实际资源与偏好选择落地路径。 
-

@@ -5,6 +5,7 @@ import {
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { RequestMethod } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import multipart from '@fastify/multipart';
 import { mkdir } from 'fs/promises';
@@ -14,6 +15,7 @@ import { getLogoUploadDir } from './upload/upload-path';
 dotenv.config({ path: '.env' });
 
 async function bootstrap() {
+  const logger = new Logger('Bootstrap');
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter({
@@ -27,11 +29,22 @@ async function bootstrap() {
 
   await instance.register(multipart);
 
+  instance.addHook('onRequest', async (req: any) => {
+    const url = req.raw?.url || req.url || '';
+    if (url === '/gateway' || url.startsWith('/gateway/')) {
+      logger.log(
+        `[GatewayIngress] ${req.method} ${url} host=${req.headers?.host || '-'} mockKey=${
+          req.headers?.['x-mock-key'] ? 'present' : 'missing'
+        }`,
+      );
+    }
+  });
+
   // 网关入口需要是 /gateway/*（不走 /api 前缀），其余业务接口统一使用 /api
   app.setGlobalPrefix('api', {
     exclude: [
       { path: 'gateway', method: RequestMethod.ALL },
-      { path: 'gateway/(.*)', method: RequestMethod.ALL },
+      { path: 'gateway{/*path}', method: RequestMethod.ALL },
     ],
   });
   app.enableCors();

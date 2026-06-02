@@ -1,6 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
 import { PrismaService } from '../prisma/prisma.service';
+import { ScriptMockService } from './script-mock.service';
+import { describeGatewayBody, getGatewayBodyBuffer } from './gateway.body';
 import {
   buildSchemaRowsFromJson,
   isHopByHopHeader,
@@ -13,7 +15,12 @@ type MockMode = 'static' | 'script' | 'proxy';
 
 @Injectable()
 export class GatewayService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(GatewayService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly scriptMockService: ScriptMockService,
+  ) {}
 
   private getMockKey(req: FastifyRequest): string | null {
     const header = (req.headers as any)['x-mock-key'];
@@ -92,6 +99,34 @@ export class GatewayService {
           section: 'body',
         },
       ];
+    }
+  }
+
+  private toQueryObject(searchParams: URLSearchParams) {
+    const query: Record<string, string | string[]> = {};
+    for (const [key, value] of searchParams.entries()) {
+      const current = query[key];
+      if (Array.isArray(current)) {
+        current.push(value);
+      } else if (current !== undefined) {
+        query[key] = [current, value];
+      } else {
+        query[key] = value;
+      }
+    }
+    return query;
+  }
+
+  private parseBodyForScript(bodyBuffer?: Buffer) {
+    if (!bodyBuffer || bodyBuffer.length === 0) {
+      return { body: null, bodyText: null };
+    }
+
+    const bodyText = bodyBuffer.toString('utf8');
+    try {
+      return { body: JSON.parse(bodyText), bodyText };
+    } catch {
+      return { body: bodyText, bodyText };
     }
   }
 
@@ -239,6 +274,7 @@ export class GatewayService {
   async handleGateway(req: FastifyRequest) {
     const mockKey = this.getMockKey(req);
     if (!mockKey) {
+      this.logger.warn(`[GatewayService] missing mock key for ${req.method} ${req.url}`);
       throw new UnauthorizedException('Missing x-mock-key header');
     }
 
@@ -252,16 +288,28 @@ export class GatewayService {
 
     const api = await this.findApi(project.id, method, pathname);
     const mode = this.decideMode(project, api);
+    this.logger.log(
+      `[GatewayService] project=${project.id} method=${method} path=${pathname} query=${parsedUrl.search || '-'} api=${
+        api?.id || 'not-found'
+      } mode=${mode}`,
+    );
 
     // 接口不存在：自动代理学习并创建
     if (!api) {
       const targetBase = this.resolveTargetBase(project, null);
       if (!targetBase) {
+        this.logger.warn(
+          `[GatewayService] project=${project.id} has no proxyUrl for unmatched ${method} ${pathname}`,
+        );
         throw new BadRequestException('Project proxyUrl is not configured');
       }
 
       const targetUrl = new URL(`${pathname}${parsedUrl.search}`, targetBase).toString();
-      const bodyBuf = (req.body as any) instanceof Buffer ? (req.body as Buffer) : undefined;
+      this.logger.log(`[GatewayService] auto-capture proxy ${method} ${pathname} -> ${targetUrl}`);
+      const bodyBuf = getGatewayBodyBuffer(req);
+      this.logger.log(
+        `[GatewayService] auto-capture body ${method} ${pathname} ${describeGatewayBody(req, bodyBuf)}`,
+      );
 
       const proxyRes = await this.forwardToUpstream({
         req,
@@ -320,6 +368,7 @@ export class GatewayService {
 
     // 接口存在：按策略返回
     if (mode === 'static') {
+      this.logger.log(`[GatewayService] static mock hit api=${api.id} ${method} ${pathname}`);
       const body = (api.mockStaticBody as string | null) ?? '{}';
       return {
         kind: 'static' as const,
@@ -332,17 +381,36 @@ export class GatewayService {
     }
 
     if (mode === 'script') {
-      // TODO: 后续接入脚本引擎
-      throw new NotFoundException('Script mode is not implemented yet');
+      this.logger.log(`[GatewayService] script mock hit api=${api.id} ${method} ${pathname}`);
+      const bodyBuf = getGatewayBodyBuffer(req);
+      const { body, bodyText } = this.parseBodyForScript(bodyBuf);
+      const script = await this.scriptMockService.execute(api.mockScript, {
+        method,
+        path: pathname,
+        url: `${pathname}${parsedUrl.search}`,
+        headers: req.headers as any,
+        query: this.toQueryObject(parsedUrl.searchParams),
+        body,
+        bodyText,
+      });
+      return {
+        kind: 'static' as const,
+        static: script,
+      };
     }
 
     // proxy
     const targetBase = this.resolveTargetBase(project, api);
     if (!targetBase) {
+      this.logger.warn(
+        `[GatewayService] project=${project.id} api=${api.id} has no proxy target for ${method} ${pathname}`,
+      );
       throw new BadRequestException('Project proxyUrl is not configured');
     }
     const targetUrl = new URL(`${pathname}${parsedUrl.search}`, targetBase).toString();
-    const bodyBuf = (req.body as any) instanceof Buffer ? (req.body as Buffer) : undefined;
+    this.logger.log(`[GatewayService] proxy hit api=${api.id} ${method} ${pathname} -> ${targetUrl}`);
+    const bodyBuf = getGatewayBodyBuffer(req);
+    this.logger.log(`[GatewayService] proxy body api=${api.id} ${describeGatewayBody(req, bodyBuf)}`);
 
     const proxyRes = await this.forwardToUpstream({
       req,
@@ -406,4 +474,3 @@ export class GatewayService {
     };
   }
 }
-

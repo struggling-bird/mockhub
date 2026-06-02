@@ -11,12 +11,14 @@
 
 | 路径 | 说明 |
 | --- | --- |
-| `src/main.ts` | NestJS + Fastify 启动入口，设置 `/api` 全局前缀、Swagger、CORS、multipart 和 gateway body parser |
+| `src/main.ts` | NestJS + Fastify 启动入口，设置 `/api` 全局前缀、Swagger、CORS、multipart 和 gateway body parser；`gateway{/*path}` 使用新版具名通配符排除 `/gateway/*` 的 `/api` 前缀 |
+| `src/gateway/gateway.controller.ts` | 网关控制器，使用 Fastify 可接受的 `@All('*')` 注册 `/gateway/*` 业务入口 |
 | `src/app.module.ts` | 聚合 Prisma、Redis、Auth、Projects、Upload、Apis、Gateway 模块 |
 | `src/auth/` | 注册、登录、JWT guard、公开路由装饰器和认证工具 |
 | `src/projects/` | 项目 CRUD、Mock Key、项目级代理配置和项目响应 DTO |
 | `src/apis/` | 项目接口 CRUD、接口 Mock 配置、代理请求 DTO |
-| `src/gateway/` | `/gateway/*` 统一入口，处理 Mock、Proxy 和请求透传 |
+| `src/gateway/` | `/gateway/*` 统一入口，处理 Static Mock、Script Mock、Proxy、自动捕获和请求透传 |
+| `src/gateway/script-mock.service.ts` | 基于 Node `vm` 的轻量脚本 Mock 执行服务，提供受限上下文、响应辅助方法和同步超时保护 |
 | `src/upload/` | Logo 上传、访问和清理 |
 | `src/prisma/` | Prisma service、MariaDB adapter 配置和启动时 schema sync |
 | `prisma/schema.prisma` | User、Project、ProjectApi 数据模型 |

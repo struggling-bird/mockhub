@@ -107,7 +107,7 @@
 
 | 节点 | 名称 | 状态 | 验收结论 |
 | --- | --- | --- | --- |
-| 节点 1 | 脚本 Mock 引擎 | 进行中 | 未验收 |
+| 节点 1 | 脚本 Mock 引擎 | 已验收 | 验收通过 |
 | 节点 2 | 请求日志与 Dashboard 数据化 | 未开始 | 未验收 |
 | 节点 3 | 公共资产 CRUD | 未开始 | 未验收 |
 | 节点 4 | 团队成员与项目权限 | 未开始 | 未验收 |
@@ -127,7 +127,7 @@
 #### 节点 1
 
 - 节点名称：脚本 Mock 引擎
-- 当前状态：`进行中`
+- 当前状态：`已验收`
 - 目标：
   - 让 `mockMode = script` 的接口在网关中可执行脚本并返回动态响应。
   - 支持基础请求上下文、响应构造、异常返回、超时限制和最小安全隔离。
@@ -155,10 +155,29 @@
   - 远端分支：默认 `origin/dev` 或用户确认后的独立开发分支。
   - 下一步推荐动作：进入“请求日志与 Dashboard 数据化”节点。
 - 完成说明：
+- 已新增 `sources/backend-nest/src/gateway/script-mock.service.ts`，使用 Node `vm` 实现轻量脚本 Mock 执行服务。
+- 已支持 `export default function(req, res) {}`、`module.exports = function(req, res) {}` 和内联脚本包装。
+- 已为脚本暴露受限请求上下文、`response.status/header/json/text/body/delay` 响应辅助方法和 `utils.randomInt/now` 工具。
+- 已在 `GatewayService` 的 `script` 模式分支接入脚本执行结果，并复用现有 static 响应返回结构。
+- 已将全局前缀排除中的网关通配符从旧写法 `gateway/(.*)` 调整为 Nest 11 / path-to-regexp 兼容写法 `gateway{/*path}`，避免 `LegacyRouteConverter` warn 并确保 `/gateway/*` 不进入 `/api` 前缀。
+- 已确认 GatewayController 需保留 Fastify 可接受的 `@All('*')`；若改成 `{*path}` 会触发 Fastify `Wildcard must be the last character in the route` 启动错误。
+- 已补充网关三层日志：`GatewayIngress`、`GatewayController`、`GatewayService`，用于确认请求是否进入 MockHub、是否命中网关路由、是否进入业务解析和转发。
+- 已修复代理转发 body 丢失问题：当 Fastify/Nest 将 JSON body 解析为 object 时，网关会重新序列化为 Buffer 继续转发，避免目标服务报 `Required request body is missing`。
+- 已新增 `gateway.body.ts` 与 `gateway.body.spec.ts`，覆盖 Buffer、object、string、empty body 的转发转换和日志描述。
+- 已新增 `script-mock.service.spec.ts` 覆盖 JSON 返回、状态码和 headers、文本返回、超时保护、`process/require` 不暴露。
+- 已同步更新 `docs/projects/mockhub/backend-design-nodejs.md` 与 `docs/projects/mockhub/source-map.md`。
 - 验证结果：
+- `cd sources/backend-nest && npm test -- --runInBand gateway.body.spec.ts script-mock.service.spec.ts`：通过，2 个测试套件、10 个测试全部通过。
+- `cd sources/backend-nest && npx nest build`：通过。
+- `cd sources/frontend && npm run build`：通过。
+- `cd sources/backend-nest && PORT=4017 npm run start`：通过，启动日志显示 `Mapped {/gateway/*, ALL} route`，未再出现 `LegacyRouteConverter` warn。
+- `curl -i http://127.0.0.1:4017/gateway/health-check`：返回 `401 Missing x-mock-key header`，说明请求已命中网关业务逻辑，不再是路由 404。
+- `curl -i -X POST http://127.0.0.1:4017/gateway/api/test -H 'content-type: application/json' -H 'x-mock-key: invalid' --data '{"name":"mockhub"}'`：返回 `401 Invalid mock key`，日志显示 `GatewayIngress` 与 `GatewayController` 均命中，说明带 body 的 POST 请求已进入 MockHub 网关入口；有效 mockKey 下会继续打印 `proxy body ... rawBodyType=... forwardBodyBytes=...`。
 - 遗留事项：
-- 用户验收结论：
-- 用户验收时间：
+- 当前脚本沙箱为轻量 Mock 场景实现，未提供独立进程或 V8 isolate 级别强隔离；后续如要运行高风险不可信脚本，应升级为 `isolated-vm` 或 Worker 进程模型。
+- 本节点未做真实数据库 API 创建后的完整脚本 Mock 请求；当前已完成无 `x-mock-key` 的 `/gateway/*` 路由命中验证，完整脚本响应可在用户验收或联调时基于真实项目数据补测。
+- 用户验收结论：用户回复“验收通过”，确认节点 1 脚本 Mock 引擎及网关代理修复通过验收。
+- 用户验收时间：2026-06-02 17:52:08 CST
 
 #### 节点 2
 
@@ -398,11 +417,11 @@
 ## 7. 完成判定
 
 - 是否已完成全部实施节点：否
-- `task-plans` 文档状态是否已同步到最新：是，当前已同步到实施计划已确认、单 Git 仓库规范修正已验收、节点 1 进行中状态。
-- 是否仍存在未完成项 / 风险项：是，全部开发节点尚未开始。
-- 最终完成结论：当前已完成方案文档与实施计划落地、实施计划确认、单 Git 仓库规范修正验收，并进入节点 1 脚本 Mock 引擎实施准备。
+- `task-plans` 文档状态是否已同步到最新：是，当前已同步到实施计划已确认、单 Git 仓库规范修正已验收、节点 1 已验收状态。
+- 是否仍存在未完成项 / 风险项：是，节点 2 至节点 7 尚未开始。
+- 最终完成结论：节点 1 脚本 Mock 引擎已完成实现、验证和用户验收，待完成节点 1 提交推送门禁后进入节点 2。
 
 ## 8. 备注
 
-- 本文档是当前任务的方案与实施计划记录，不代表任何开发节点已经开始。
+- 本文档是当前任务的方案与实施计划记录，当前节点 1 已完成实现、验证和用户验收。
 - 前端国际化完整覆盖作为横向约束，在后续涉及相关页面的节点中随功能修改同步补齐。
