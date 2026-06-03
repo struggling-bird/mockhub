@@ -4,6 +4,7 @@ import {
   Braces,
   CheckCircle2,
   Copy,
+  Database,
   FileJson,
   LoaderCircle,
   Plus,
@@ -11,7 +12,7 @@ import {
   Terminal,
   Zap,
 } from 'lucide-react';
-import type { ApiHeaderRow, ApiMockMode, ApiSchemaRow } from '../../types';
+import type { ApiHeaderRow, ApiMockMode, ApiSchemaRow, PublicAsset } from '../../types';
 import JsonCodeEditor from './JsonCodeEditor';
 import SchemaRow from './SchemaRow';
 
@@ -51,6 +52,7 @@ interface ApiTabContentProps {
     message: string;
   } | null;
   proxyStaticSaving: boolean;
+  publicAssets: PublicAsset[];
 }
 
 interface NestedSchemaNode {
@@ -101,6 +103,7 @@ const ApiTabContent: React.FC<ApiTabContentProps> = ({
   proxyResponseBody,
   proxyResponseFeedback,
   proxyStaticSaving,
+  publicAssets,
 }) => {
   const matchesSection = (
     row: ApiSchemaRow,
@@ -427,6 +430,63 @@ const ApiTabContent: React.FC<ApiTabContentProps> = ({
       default:
         return 'border-blue-200 bg-blue-50 text-blue-700';
     }
+  };
+
+  const copyAssetValue = (value: string) => {
+    void navigator.clipboard.writeText(value).catch(() => {});
+  };
+
+  const insertAssetValue = (asset: PublicAsset) => {
+    if (responseMode === 'script') {
+      const key = asset.name.replace(/[^a-zA-Z0-9]+(.)/g, (_, char) => String(char).toUpperCase()).replace(/^[^a-zA-Z]+/, '');
+      const variableName = key ? key.charAt(0).toLowerCase() + key.slice(1) : 'publicAsset';
+      setMockScript(`${mockScript}\n\nconst ${variableName} = ${JSON.stringify(asset.value)};`);
+      return;
+    }
+    if (asset.type.toLowerCase() === 'json' || asset.type.toLowerCase() === 'errorcode') {
+      setMockStaticBody(asset.value);
+      return;
+    }
+    setMockStaticBody(JSON.stringify({ value: asset.value }, null, 2));
+  };
+
+  const renderAssetReference = () => {
+    if (publicAssets.length === 0 || responseMode === 'proxy') return null;
+    return (
+      <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+        <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+          <Database size={12} />
+          {t('mockAssetReferenceTitle')}
+        </div>
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+          {publicAssets.slice(0, 6).map((asset) => (
+            <div key={asset.id} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+              <div className="min-w-0">
+                <div className="truncate text-xs font-bold text-slate-800">{asset.name}</div>
+                <div className="truncate font-mono text-[10px] text-slate-400">{asset.type} · {asset.value}</div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => copyAssetValue(asset.value)}
+                  className="rounded border border-slate-200 p-1 text-slate-400 hover:text-blue-600"
+                  title={t('mockAssetCopy')}
+                >
+                  <Copy size={12} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertAssetValue(asset)}
+                  className="rounded border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-600 hover:bg-blue-100"
+                >
+                  {t('mockAssetInsert')}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   const renderJsonEditor = (
@@ -1211,15 +1271,16 @@ const ApiTabContent: React.FC<ApiTabContentProps> = ({
             </div>
           ) : responseMode === 'static' ? (
             <div className="space-y-3">
+              {renderAssetReference()}
               <div className="flex items-center justify-between">
                 <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                   {t('mockStaticPreviewTitle')}
                 </h5>
                 <div className="flex gap-2">
-                  <button className="p-1.5 text-slate-400 hover:text-blue-600 bg-slate-50 rounded border border-slate-200">
+                  <button className="p-1.5 text-slate-400 hover:text-blue-600 bg-slate-50 rounded border border-slate-200 cursor-pointer">
                     <Copy size={12} />
                   </button>
-                  <button className="p-1.5 text-slate-400 hover:text-blue-600 bg-slate-50 rounded border border-slate-200">
+                  <button className="p-1.5 text-slate-400 hover:text-blue-600 bg-slate-50 rounded border border-slate-200 cursor-pointer">
                     <Braces size={12} />
                   </button>
                 </div>
@@ -1232,6 +1293,7 @@ const ApiTabContent: React.FC<ApiTabContentProps> = ({
             </div>
           ) : (
             <div className="space-y-3">
+              {renderAssetReference()}
               <div className="flex items-center justify-between">
                 <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                   {t('mockDynamicTitle')}
@@ -1244,10 +1306,10 @@ const ApiTabContent: React.FC<ApiTabContentProps> = ({
               </div>
               <div className="relative group">
                 <div className="absolute top-3 right-3 z-10 flex gap-2">
-                  <button className="p-1.5 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors shadow-lg">
+                  <button className="p-1.5 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors shadow-lg cursor-pointer">
                     <Copy size={12} />
                   </button>
-                  <button className="p-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors shadow-lg">
+                  <button className="p-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors shadow-lg cursor-pointer">
                     <Save size={12} />
                   </button>
                 </div>

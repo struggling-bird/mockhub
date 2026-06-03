@@ -139,7 +139,7 @@ function AppContent() {
                       return (
                         <button
                           key={p.id}
-                          className={`w-full px-3 py-1.5 text-xs text-left hover:bg-slate-50 ${
+                          className={`w-full px-3 py-1.5 text-xs text-left hover:bg-slate-50 cursor-pointer ${
                             p.id === currentProjectId ? 'text-blue-600 font-semibold' : 'text-slate-600'
                           }`}
                           onClick={() => {
@@ -171,18 +171,18 @@ function AppContent() {
             <div className="flex bg-slate-100 p-1 rounded-lg">
               <button 
                 onClick={() => setLanguage('en')}
-                className={`px-2 py-1 text-[10px] font-bold rounded transition-all ${language === 'en' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}
+                className={`px-2 py-1 text-[10px] font-bold rounded transition-all cursor-pointer ${language === 'en' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}
               >
                 EN
               </button>
               <button 
                 onClick={() => setLanguage('zh')}
-                className={`px-2 py-1 text-[10px] font-bold rounded transition-all ${language === 'zh' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}
+                className={`px-2 py-1 text-[10px] font-bold rounded transition-all cursor-pointer ${language === 'zh' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}
               >
                 中文
               </button>
             </div>
-              <button className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-full transition-colors relative">
+              <button className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-full transition-colors relative cursor-pointer">
               <Bell size={20} />
               <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
             </button>

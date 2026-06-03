@@ -55,6 +55,25 @@ export interface ApiItem {
   mockProxyUrl?: string | null;
 }
 
+export interface PublicAsset {
+  id: string;
+  name: string;
+  value: string;
+  type: string;
+  category: string;
+}
+
+export interface AssetSuggestion {
+  id: string;
+  name: string;
+  value: string;
+  type: string;
+  category: string;
+  source: string;
+  count: number;
+  confidence: number;
+}
+
 export interface ProxyGroup {
   id: string;
   name: string;

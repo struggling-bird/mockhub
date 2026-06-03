@@ -181,6 +181,23 @@ export async function ensureDatabaseSchema(config: DatabaseConfig) {
           ON DELETE SET NULL
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS public_assets (
+        id          VARCHAR(50)  NOT NULL PRIMARY KEY,
+        project_id  VARCHAR(50)  NOT NULL,
+        name        VARCHAR(255) NOT NULL,
+        value       TEXT         NOT NULL,
+        type        VARCHAR(50)  NOT NULL,
+        category    VARCHAR(255) NOT NULL,
+        created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_public_assets_project_id (project_id),
+        CONSTRAINT fk_public_assets_project
+          FOREIGN KEY (project_id) REFERENCES projects(id)
+          ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
   } finally {
     await conn.end();
   }

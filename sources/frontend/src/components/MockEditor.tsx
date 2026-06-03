@@ -59,7 +59,7 @@ if (request.query.id === 'admin') {
               <p className="text-xs text-slate-500">{apiName}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer">
             <X size={20} />
           </button>
         </div>
@@ -69,7 +69,7 @@ if (request.query.id === 'admin') {
           <div className="flex bg-white border border-slate-200 p-1 rounded-lg">
             <button 
               onClick={() => setMode('json')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
                 mode === 'json' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-900'
               }`}
             >
@@ -77,7 +77,7 @@ if (request.query.id === 'admin') {
             </button>
             <button 
               onClick={() => setMode('script')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
                 mode === 'script' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-900'
               }`}
             >
@@ -88,12 +88,12 @@ if (request.query.id === 'admin') {
           <div className="flex items-center gap-2">
             <button 
               onClick={handleCopy}
-              className="flex items-center gap-2 px-3 py-1.5 text-slate-600 hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 rounded-lg text-xs font-bold transition-all"
+              className="flex items-center gap-2 px-3 py-1.5 text-slate-600 hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
             >
               {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
               {copied ? 'Copied' : 'Copy'}
             </button>
-            <button className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg text-xs font-bold transition-all">
+            <button className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg text-xs font-bold transition-all cursor-pointer">
               <Play size={14} /> Test Run
             </button>
           </div>
@@ -120,10 +120,10 @@ if (request.query.id === 'admin') {
             Last saved: Today at 14:22
           </div>
           <div className="flex gap-3">
-            <button onClick={onClose} className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 rounded-lg transition-colors">
+            <button onClick={onClose} className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer">
               Cancel
             </button>
-            <button className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/20">
+            <button className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/20 cursor-pointer">
               <Save size={16} /> Save Changes
             </button>
           </div>

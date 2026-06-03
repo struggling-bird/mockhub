@@ -11,6 +11,7 @@ import { ApisModule } from './apis/apis.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { GatewayModule } from './gateway/gateway.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { AssetsModule } from './assets/assets.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     ApisModule,
     GatewayModule,
     DashboardModule,
+    AssetsModule,
   ],
   controllers: [AppController],
   providers: [

@@ -3,7 +3,7 @@ import {
   Search, Plus, MoreVertical, Code2, ChevronRight, ChevronDown, Globe, Clock, Settings2, Trash2,
   Save, X, ShieldCheck, Zap, Database, ListFilter, Braces, FileJson, Folder, FolderTree, List, LoaderCircle
 } from 'lucide-react';
-import type { ApiItem, ApiHeaderRow, ApiSchemaRow, ApiMockMode } from '../../types';
+import type { ApiItem, ApiHeaderRow, ApiSchemaRow, ApiMockMode, PublicAsset } from '../../types';
 import { useLanguage } from '../../context/LanguageContext';
 import { formatLastCall } from '../../utils/relativeTime';
 import { request } from '../../utils/http';
@@ -47,6 +47,7 @@ const ApiTable: React.FC = () => {
     message: string;
   } | null>(null);
   const [proxyStaticSaving, setProxyStaticSaving] = useState(false);
+  const [publicAssets, setPublicAssets] = useState<PublicAsset[]>([]);
 
   const fetchApis = useCallback(async () => {
     if (!projectId) {
@@ -78,6 +79,16 @@ const ApiTable: React.FC = () => {
   useEffect(() => {
     fetchApis();
   }, [fetchApis]);
+
+  useEffect(() => {
+    if (!projectId) {
+      setPublicAssets([]);
+      return;
+    }
+    request<PublicAsset[]>(`/api/projects/${projectId}/assets`)
+      .then(setPublicAssets)
+      .catch(() => setPublicAssets([]));
+  }, [projectId]);
 
   const selectedApi = apis.find((a) => a.id === selectedApiId);
   useEffect(() => {
@@ -705,12 +716,15 @@ export default function(req, res) {
     });
   };
 
-  const proxyOptions = [
+  const proxyOptions = Array.from(new Set([
     'https://api.production.com',
     'https://api.staging.com',
     'http://localhost:8080',
-    'https://mock-server.dev'
-  ];
+    'https://mock-server.dev',
+    ...publicAssets
+      .filter((asset) => asset.type.toLowerCase() === 'url')
+      .map((asset) => asset.value),
+  ]));
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -939,6 +953,7 @@ export default function(req, res) {
                   proxyResponseBody={proxyResponseBody}
                   proxyResponseFeedback={proxyResponseFeedback}
                   proxyStaticSaving={proxyStaticSaving}
+                  publicAssets={publicAssets}
                 />
               </div>
             </div>
