@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Mail, Lock, User, Building, Zap, ArrowRight } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { request, ApiError } from '../../utils/http';
@@ -8,7 +8,8 @@ interface AuthProps {
 }
 
 const Auth: React.FC<AuthProps> = ({ onLogin }) => {
-  const [isLogin, setIsLogin] = useState(true);
+  const inviteToken = new URLSearchParams(window.location.search).get('invite') || '';
+  const [isLogin, setIsLogin] = useState(!inviteToken);
   const { t, language, setLanguage } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -16,6 +17,34 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   const [company, setCompany] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [invite, setInvite] = useState<{
+    projectName: string;
+    organizationName: string;
+    email: string;
+    role: string;
+    status: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!inviteToken) return;
+    (async () => {
+      try {
+        const data = await request<{
+          projectName: string;
+          organizationName: string;
+          email: string;
+          role: string;
+          status: string;
+        }>(`/api/projects/invitations/${inviteToken}`, { withAuth: false });
+        setInvite(data);
+        setEmail(data.email);
+        setCompany(data.organizationName || data.projectName);
+        setIsLogin(false);
+      } catch {
+        setError(t('inviteInvalid'));
+      }
+    })();
+  }, [inviteToken, t]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,7 +55,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
       const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
       const body = isLogin
         ? { email, password }
-        : { email, password, username, company };
+        : { email, password, username, company, inviteToken: inviteToken || undefined };
 
       const data = await request<{ token: string }> (endpoint, {
         method: 'POST',
@@ -39,6 +68,13 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
       if (data?.token) {
         window.localStorage.setItem('mockhub_token', data.token);
+      }
+      if (isLogin && inviteToken) {
+        await request('/api/projects/invitations/accept', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: inviteToken }),
+        });
       }
       setLoading(false);
       onLogin();
@@ -80,6 +116,20 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         </div>
 
         <div className="bg-white border border-slate-200 rounded-2xl shadow-xl p-8">
+          {invite ? (
+            <div className="mb-5 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
+              <div className="text-xs font-bold text-blue-700">{t('inviteTitle')}</div>
+              <div className="mt-1 text-sm font-semibold text-slate-900">{invite.projectName}</div>
+              <div className="mt-1 text-xs text-slate-500">
+                {t('inviteDesc')} {invite.email} · {invite.role}
+              </div>
+              {!isLogin ? (
+                <div className="mt-2 text-[11px] font-semibold text-blue-700">
+                  {t('inviteLockedInfo')}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           <form className="space-y-4" onSubmit={handleSubmit}>
             {!isLogin && (
               <>
@@ -104,7 +154,8 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                       type="text"
                       value={company}
                       onChange={(e) => setCompany(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                      disabled={Boolean(inviteToken && invite)}
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:text-slate-500 transition-all"
                       placeholder={t('companyPlaceholder')}
                     />
                   </div>
@@ -120,7 +171,8 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                  disabled={Boolean(inviteToken && invite && !isLogin)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:text-slate-500 transition-all"
                   placeholder={t('emailPlaceholder')}
                 />
               </div>
@@ -145,7 +197,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
               disabled={loading}
               className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 group cursor-pointer"
             >
-              {loading ? (isLogin ? '登录中...' : '注册中...') : isLogin ? t('login') : t('register')}
+              {loading ? (isLogin ? '登录中...' : '注册中...') : isLogin ? t('login') : invite ? t('acceptInviteCreateAccount') : t('register')}
               <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
             </button>
           </form>

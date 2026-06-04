@@ -26,5 +26,11 @@ export class RegisterDto {
     example: 'MockHub 科技有限公司',
   })
   company?: string;
-}
 
+  @ApiProperty({
+    required: false,
+    description: '项目邀请 token，注册成功后自动接受邀请并加入项目',
+    example: 'inv_abc123',
+  })
+  inviteToken?: string;
+}

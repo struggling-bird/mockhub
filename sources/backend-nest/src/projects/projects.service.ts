@@ -8,10 +8,14 @@ import {
 } from '../upload/upload-path';
 import * as fs from 'fs/promises';
 import { ok } from '../common/api-response';
+import { ProjectAccessService } from './project-access.service';
 
 @Injectable()
 export class ProjectsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly projectAccess: ProjectAccessService,
+  ) {}
 
   private async deleteLogoFile(logoUrl?: string | null) {
     if (!logoUrl || !isManagedLogoUrl(logoUrl)) return;
@@ -27,26 +31,54 @@ export class ProjectsService {
     }
   }
 
+  private toSummary(project: any, role?: string) {
+    return {
+      id: project.id,
+      name: project.name,
+      description: project.description,
+      createdAt: project.createdAt.toISOString(),
+      logoUrl: project.logoUrl ?? null,
+      proxyUrl: project.proxyUrl ?? null,
+      mockKey: project.mockKey,
+      defaultMockMode: project.defaultMockMode ?? 'static',
+      autoCapture: project.autoCapture ?? false,
+      cookieRewriteMode: project.cookieRewriteMode ?? 'off',
+      cookieRewriteDomain: project.cookieRewriteDomain ?? null,
+      role,
+    };
+  }
+
   async listByOwner(ownerId: string) {
-    const projects = await this.prisma.project.findMany({
-      where: { ownerId },
-      orderBy: { createdAt: 'desc' },
-    });
+    const projects = await this.prisma.$queryRaw<any[]>`
+      SELECT
+        p.id,
+        p.name,
+        p.description,
+        p.logo_url AS logoUrl,
+        p.proxy_url AS proxyUrl,
+        p.mock_key AS mockKey,
+        p.default_mock_mode AS defaultMockMode,
+        p.auto_capture AS autoCapture,
+        p.cookie_rewrite_mode AS cookieRewriteMode,
+        p.cookie_rewrite_domain AS cookieRewriteDomain,
+        p.owner_id AS ownerId,
+        p.created_at AS createdAt,
+        p.updated_at AS updatedAt,
+        CASE
+          WHEN p.owner_id = ${ownerId} THEN 'Owner'
+          ELSE pm.role
+        END AS role
+      FROM projects p
+      LEFT JOIN project_members pm
+        ON pm.project_id = p.id
+       AND pm.user_id = ${ownerId}
+       AND pm.status = 'Active'
+      WHERE ${this.projectAccess.visibleProjectFilter(ownerId)}
+      ORDER BY p.created_at DESC
+    `;
 
     return ok(
-      projects.map((p) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        createdAt: p.createdAt.toISOString(),
-        logoUrl: p.logoUrl ?? null,
-        proxyUrl: (p as any).proxyUrl ?? null,
-        mockKey: p.mockKey,
-        defaultMockMode: (p as any).defaultMockMode ?? 'static',
-        autoCapture: (p as any).autoCapture ?? false,
-        cookieRewriteMode: (p as any).cookieRewriteMode ?? 'off',
-        cookieRewriteDomain: (p as any).cookieRewriteDomain ?? null,
-      })),
+      projects.map((p) => this.toSummary(p, p.role)),
       '获取项目列表成功',
     );
   }
@@ -75,51 +107,24 @@ export class ProjectsService {
       } as any,
     });
 
-    return ok(
-      {
-        id: project.id,
-        name: project.name,
-        description: project.description,
-        createdAt: project.createdAt.toISOString(),
-        logoUrl: project.logoUrl ?? null,
-        proxyUrl: (project as any).proxyUrl ?? null,
-        mockKey: project.mockKey,
-        defaultMockMode: (project as any).defaultMockMode ?? 'static',
-        autoCapture: (project as any).autoCapture ?? false,
-        cookieRewriteMode: (project as any).cookieRewriteMode ?? 'off',
-        cookieRewriteDomain: (project as any).cookieRewriteDomain ?? null,
-      },
-      '创建项目成功',
-    );
+    return ok(this.toSummary(project, 'Owner'), '创建项目成功');
   }
 
   async getById(ownerId: string, id: string) {
+    const access = await this.projectAccess.ensurePermission(ownerId, id, 'project.view');
     const project = await this.prisma.project.findFirst({
-      where: { id, ownerId },
+      where: { id },
     });
     if (!project) {
       throw new NotFoundException('Project not found');
     }
-    return ok(
-      {
-        id: project.id,
-        name: project.name,
-        description: project.description,
-        logoUrl: project.logoUrl ?? null,
-        proxyUrl: (project as any).proxyUrl ?? null,
-        mockKey: project.mockKey,
-        defaultMockMode: (project as any).defaultMockMode ?? 'static',
-        autoCapture: (project as any).autoCapture ?? false,
-        cookieRewriteMode: (project as any).cookieRewriteMode ?? 'off',
-        cookieRewriteDomain: (project as any).cookieRewriteDomain ?? null,
-      },
-      '获取项目详情成功',
-    );
+    return ok(this.toSummary(project, access.role), '获取项目详情成功');
   }
 
   async update(ownerId: string, id: string, dto: UpdateProjectDto) {
+    const access = await this.projectAccess.ensurePermission(ownerId, id, 'project.update');
     const project = await this.prisma.project.findFirst({
-      where: { id, ownerId },
+      where: { id },
     });
     if (!project) {
       throw new NotFoundException('Project not found');
@@ -158,26 +163,13 @@ export class ProjectsService {
       await this.deleteLogoFile(project.logoUrl);
     }
 
-    return ok(
-      {
-        id: updated.id,
-        name: updated.name,
-        description: updated.description,
-        logoUrl: updated.logoUrl ?? null,
-        proxyUrl: (updated as any).proxyUrl ?? null,
-        mockKey: updated.mockKey,
-        defaultMockMode: (updated as any).defaultMockMode ?? 'static',
-        autoCapture: (updated as any).autoCapture ?? false,
-        cookieRewriteMode: (updated as any).cookieRewriteMode ?? 'off',
-        cookieRewriteDomain: (updated as any).cookieRewriteDomain ?? null,
-      },
-      '更新项目成功',
-    );
+    return ok(this.toSummary(updated, access.role), '更新项目成功');
   }
 
   async delete(ownerId: string, id: string) {
+    await this.projectAccess.ensurePermission(ownerId, id, 'project.delete');
     const project = await this.prisma.project.findFirst({
-      where: { id, ownerId },
+      where: { id },
     });
     if (!project) {
       throw new NotFoundException('Project not found');
@@ -189,4 +181,3 @@ export class ProjectsService {
     return ok({ success: true }, '删除项目成功');
   }
 }
-

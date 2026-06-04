@@ -12,6 +12,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { GatewayModule } from './gateway/gateway.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { AssetsModule } from './assets/assets.module';
+import { TeamModule } from './team/team.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { AssetsModule } from './assets/assets.module';
     GatewayModule,
     DashboardModule,
     AssetsModule,
+    TeamModule,
   ],
   controllers: [AppController],
   providers: [

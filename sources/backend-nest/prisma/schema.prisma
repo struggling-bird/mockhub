@@ -10,9 +10,13 @@ model User {
   id        String    @id @map("id")
   email     String    @unique @map("email")
   password  String    @map("password")
+  username  String?   @map("username")
+  company   String?   @map("company")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   projects  Project[]
+  memberships ProjectMember[]
+  sentInvitations ProjectInvitation[] @relation("InvitationInviter")
 
   @@map("users")
 }
@@ -34,11 +38,90 @@ model Project {
   apis        ProjectApi[]
   requestLogs RequestLog[]
   assets      PublicAsset[]
+  members     ProjectMember[]
+  invitations ProjectInvitation[]
+  roles       ProjectRoleDefinition[]
+  rolePermissions ProjectRolePermission[]
 
   owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   @@index([ownerId])
   @@map("projects")
+}
+
+model ProjectRoleDefinition {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  roleKey     String   @map("role_key")
+  name        String
+  description String?  @map("description")
+  systemRole  Boolean  @default(false) @map("system_role")
+  locked      Boolean  @default(false)
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, roleKey])
+  @@index([projectId])
+  @@map("project_roles")
+}
+
+model ProjectRolePermission {
+  id            String   @id @default(cuid())
+  projectId     String   @map("project_id")
+  role          String
+  permissionKey String   @map("permission_key")
+  enabled       Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, role, permissionKey])
+  @@index([projectId])
+  @@map("project_role_permissions")
+}
+
+model ProjectMember {
+  id        String   @id @default(cuid())
+  projectId String   @map("project_id")
+  userId    String   @map("user_id")
+  role      String
+  status    String   @default("Active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@index([projectId])
+  @@map("project_members")
+}
+
+model ProjectInvitation {
+  id          String    @id @default(cuid())
+  projectId   String    @map("project_id")
+  email       String
+  role        String
+  token       String    @unique
+  status      String    @default("Pending")
+  invitedById String    @map("invited_by_id")
+  expiresAt   DateTime  @map("expires_at")
+  acceptedAt  DateTime? @map("accepted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  invitedBy User    @relation("InvitationInviter", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([email])
+  @@index([status])
+  @@map("project_invitations")
 }
 
 model PublicAsset {

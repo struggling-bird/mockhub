@@ -110,7 +110,7 @@
 | 节点 1 | 脚本 Mock 引擎 | 已验收 | 验收通过 |
 | 节点 2 | 请求日志与 Dashboard 数据化 | 已验收 | 验收通过 |
 | 节点 3 | 公共资产 CRUD | 已验收 | 验收通过 |
-| 节点 4 | 团队成员与项目权限 | 未开始 | 未验收 |
+| 节点 4 | 团队成员与项目权限 | 已验收 | 验收通过 |
 | 节点 5 | 代理规则分组 | 未开始 | 未验收 |
 | 节点 6 | 多环境与场景编排 | 未开始 | 未验收 |
 | 节点 7 | Analytics 与审计增强 | 未开始 | 未验收 |
@@ -331,35 +331,199 @@
 #### 节点 4
 
 - 节点名称：团队成员与项目权限
-- 当前状态：`未开始`
+- 当前状态：`已验收`
+- 方案确认：
+  - 用户已确认“节点 4 团队成员与项目权限”方案，进入实施计划落地。
+  - 确认时间：2026-06-03。
+  - 用户在节点 4 初次验收中明确指出：添加成员不能只支持已注册账号，合法邮箱均应可邀请，未注册账号通过邀请注册后需自动加入团队；页面缺少角色管理相关功能，当前完成度未达到验收标准。
+  - 用户已确认“节点 4 邀请链路与角色管理增强”调整方案。
+  - 用户在节点 4 二次验收中明确指出：成员管理、邀请管理、角色管理需要按照业务场景拆分页面，而不是堆在一个大而全页面中；页面设计需要体现业务逻辑性。
+  - 用户已确认“节点 4 Team 页面按成员管理、邀请管理、角色权限分区”调整方案并继续实施。
+  - 用户在节点 4 三次验收中明确指出：被邀请账号注册时，公司名称和邮箱应默认填充且不可编辑，避免邀请注册身份与组织归属产生歧义。
+  - 用户已确认“节点 4 被邀请注册邮箱与公司锁定逻辑”补充方案。
+  - 用户在节点 4 四次验收中明确指出：角色、权限无法编辑，且目前权限粒度太过粗泛。
+  - 用户已确认“节点 4 角色权限可编辑与权限粒度细化”补充方案。
+  - 用户在节点 4 五次验收中明确指出：角色本身也应该可编辑；权限维护应取消当前横向平铺矩阵交互，因为该交互不利于后续自定义角色拓展维护。
+  - 用户已确认“节点 4 角色可编辑与权限维护交互重构”补充方案。
+  - 用户在节点 4 六次验收中明确指出：内置角色信息需要改成中文，避免中文界面中仍显示 Owner/Admin/Editor/Viewer 和英文描述。
+  - 用户已确认“节点 4 内置角色中文化”补充方案。
 - 目标：
   - 建立项目成员模型、角色和基础权限边界。
   - 将 Team 页面从静态成员列表升级为真实项目成员管理。
+  - 将项目访问从 owner-only 扩展为 owner/member 协作访问。
 - 前置条件：
   - 节点 3 已完成并经用户验收，且完成提交推送门禁。
+  - 当前工作空间仓库分支：`codex/mockhub-script-mock-engine`。
+  - 当前远端跟踪分支：`origin/codex/mockhub-script-mock-engine`。
+  - 当前工作区状态：干净。
+  - 当前任务涉及 `sources/backend-nest` 与 `sources/frontend`，二者均为当前工作空间单 Git 仓库内源码目录。
+  - 角色与权限边界：
+  - `Owner`：由 `projects.owner_id` 表示，拥有项目、成员、接口、资产的完整管理权限。
+  - `Admin`：可管理成员、编辑项目、管理接口和公共资产，但不可删除项目 owner 身份本身。
+  - `Editor`：可编辑接口和公共资产，不可管理成员、删除项目。
+  - `Viewer`：只读项目、接口、公共资产和团队成员列表。
+  - 成员邀请支持任意合法邮箱，不要求邮箱已注册。
+  - 已注册用户可通过邀请链接接受邀请后加入项目；未注册用户通过邀请链接注册后自动加入项目。
 - 实施步骤：
-  - 增加 `ProjectMember` 模型。
-  - 调整项目访问校验，从 owner-only 扩展为 owner/member 权限。
-  - 增加团队成员查询、邀请或添加、角色调整、移除接口。
-  - 前端 Team 页面接入真实接口，补充国际化。
-  - 同步权限相关文档与 skill。
+  - 数据模型与 schema sync：
+    - 在 Prisma schema 中新增 `ProjectMember` 模型，字段包含 `id`、`projectId`、`userId`、`role`、`status`、`createdAt`、`updatedAt`。
+    - 在 `schema-sync.ts` 中新增 `project_members` 表创建、唯一约束和索引。
+    - `Owner` 不强制写入 `project_members` 表，Team 列表以虚拟 owner 成员行返回。
+  - 权限服务：
+    - 新增项目权限校验能力，支持判断当前用户是 owner、admin、editor、viewer 或非成员。
+    - 替换 `projects`、`apis`、`assets` 中的 owner-only 校验。
+    - 项目列表返回当前用户 owner 项目和 member 项目。
+  - Team 后端模块：
+    - 新增 `TeamModule`、controller、service、DTO。
+    - 提供 `GET /api/projects/:projectId/members` 查询成员。
+    - 提供 `POST /api/projects/:projectId/members` 按邮箱添加已注册用户为成员。
+    - 提供 `PUT /api/projects/:projectId/members/:memberId` 调整角色或状态。
+    - 提供 `DELETE /api/projects/:projectId/members/:memberId` 移除成员。
+  - 邀请链路增强：
+    - 新增 `ProjectInvitation` 数据模型与 `project_invitations` schema sync，记录项目、邮箱、角色、token、状态、邀请人、过期时间和接受时间。
+    - Team 后端模块新增邀请接口，支持邀请任意合法邮箱，生成邀请 token、邀请链接和邀请消息。
+    - Team 后端模块新增邀请列表、复制信息所需数据、撤销邀请接口。
+    - 新增邀请详情接口，用于通过 token 查看项目名、邀请邮箱、角色和状态。
+    - 新增接受邀请接口；已登录用户接受后加入项目，未注册用户注册完成后自动接受邀请。
+    - 注册接口支持可选 invite token，注册成功后自动加入被邀请项目。
+  - 权限落地：
+    - 非项目成员无法访问项目、接口、公共资产和成员数据。
+    - `Viewer` 可读不可写。
+    - `Editor` 可管理接口和公共资产。
+    - `Admin/Owner` 可管理成员。
+  - Dashboard：
+    - Dashboard Team 指标从固定 `1` 改为当前可见项目下真实 owner + member 去重计数。
+  - 前端 Team 页面：
+    - 从静态数组改为调用真实成员接口。
+    - 补充 loading、empty、error、搜索、添加成员、角色调整、状态调整或移除交互。
+    - 补充中英文国际化文案。
+    - 将“添加成员”升级为“邀请成员”，允许输入任意合法邮箱。
+    - 邀请成功后自动复制邀请消息和邀请链接，并在页面展示待接受邀请。
+    - 待接受邀请支持复制链接和撤销。
+    - 增加角色与权限管理区域，展示 Owner/Admin/Editor/Viewer 权限矩阵，不只依赖成员行内角色下拉。
+    - 注册页识别 invite token，展示邀请上下文并在注册成功后自动接受邀请。
+    - Team 页面改为「成员管理 / 邀请管理 / 角色权限」Tab 分区，默认进入成员管理，避免成员维护、邀请流转和权限认知混在一个大页面中。
+  - 被邀请注册锁定逻辑：
+    - 邀请详情接口补充返回组织/公司上下文，用于注册页展示被邀请账号将加入的组织归属。
+    - 注册页存在 invite token 时，默认填充邀请邮箱和公司名称，并将邮箱、公司名称设为不可编辑。
+    - 注册页存在 invite token 时，提交注册仍携带 invite token；后端注册时以邀请 token 中的邮箱和组织上下文为准，不信任前端可篡改的邮箱和公司字段。
+    - 已登录用户接受邀请时继续要求当前登录邮箱与邀请邮箱一致，防止跨邮箱接受。
+  - 角色权限可编辑与权限粒度细化：
+    - 新增项目级角色权限配置存储，支持按项目覆盖 `Admin`、`Editor`、`Viewer` 的权限项；`Owner` 为系统内置全权限，不允许编辑。
+    - 权限项粒度拆分为项目、接口、公共资产、团队、角色权限五组：
+      - 项目：查看项目、编辑项目、删除项目。
+      - 接口：查看接口、新建接口、编辑接口、删除接口、调试/代理请求。
+      - 公共资产：查看资产、新增资产、编辑资产、删除资产、接受建议资产、忽略建议资产。
+      - 团队：查看成员、邀请成员、编辑成员角色/状态、移除成员、撤销邀请。
+      - 角色权限：查看角色权限、编辑角色权限。
+    - 后端 `ProjectAccessService` 从角色等级判断升级为权限 key 判断，并保留默认权限模板作为旧项目回退。
+    - `projects`、`apis`、`assets`、`team` 相关写操作改为检查具体权限项，而不是只按 `Admin/Editor/Viewer` 粗粒度判断。
+    - Team 后端模块新增角色权限查询与保存接口，保存时仅允许 `Owner` 操作，禁止修改 `Owner` 全权限。
+    - Team 前端「角色权限」Tab 从静态矩阵升级为可编辑权限表格；Owner 列锁定展示，Admin/Editor/Viewer 列可由 Owner 勾选/取消，非 Owner 只读。
+    - 保存角色权限后刷新当前项目成员数据，使页面展示与后端权限边界保持一致。
+  - 角色可编辑与权限维护交互重构：
+    - 新增项目级角色定义存储，角色从固定枚举升级为项目内可维护资源；默认补齐 `Owner`、`Admin`、`Editor`、`Viewer`。
+    - `Owner` 保持系统内置角色，固定全权限，不允许删除，不允许关闭核心权限。
+    - `Admin`、`Editor`、`Viewer` 以及后续自定义角色支持编辑名称、描述和权限；支持新增自定义角色、复制现有角色、删除未被成员或待接受邀请引用的自定义角色。
+    - 成员和邀请角色选择改为读取当前项目角色列表，不再在前端和后端写死 `Admin`、`Editor`、`Viewer`。
+    - 后端权限校验改为通过角色定义的 `roleKey` 或角色 ID 解析权限；已有 `project_members.role` 与 `project_invitations.role` 暂按 role key 兼容。
+    - Team 前端「角色权限」Tab 取消横向平铺矩阵，改为左侧角色列表、右侧角色详情和分组权限编辑。
+    - 权限维护采用项目、接口、公共资产、团队、角色管理等分组面板或模块化列表；每次只编辑当前选中角色的权限，便于后续自定义角色扩展。
+    - 保存当前角色后刷新角色列表、成员角色选项和权限详情，保证成员管理、邀请管理与角色权限配置一致。
+  - 内置角色中文化：
+    - 后端默认内置角色展示名称和描述改为中文，保留 `roleKey` 不变。
+    - `Owner` 展示为“所有者”，描述为“项目所有者，拥有完整访问权限。”
+    - `Admin` 展示为“管理员”，描述为“管理项目、成员、接口和公共资产。”
+    - `Editor` 展示为“编辑者”，描述为“维护接口和公共资产。”
+    - `Viewer` 展示为“查看者”，描述为“仅查看项目资源。”
+    - 对已经初始化过的项目，`ensureDefaultRoles` 同步 `system_role = 1` 的内置角色展示信息；不覆盖自定义角色。
+  - 文档同步：
+    - 更新 `docs/product-knowledge/mockhub.md`、`docs/projects/mockhub/source-map.md`、`docs/projects/mockhub/frontend-product-design.md` 和必要开发规范说明。
 - 验证方式：
-  - 后端构建、前端构建。
-  - 使用不同用户验证项目访问权限和角色边界。
+  - `cd sources/backend-nest && npx nest build`
+  - `cd sources/frontend && npm run build`
+  - `cd sources/backend-nest && npm test -- --runInBand gateway.body.spec.ts script-mock.service.spec.ts`
+  - `git diff --check`
+  - 如新增权限单测，则补充执行对应测试文件。
+  - 通过代码路径或测试验证 owner/admin/editor/viewer/非成员的访问边界。
 - 验收标准：
   - 项目成员可被管理。
   - 非项目成员无法访问项目数据。
   - 角色权限与文档描述一致。
+  - 合法邮箱均可被邀请，未注册邮箱可通过邀请注册后自动加入项目。
+  - 点击邀请会生成邀请消息和链接，并自动复制。
+  - Team 页面具备明确角色管理/权限矩阵，不只提供行内角色下拉。
+  - Team 页面按成员管理、邀请管理、角色权限进行功能分区，默认展示成员管理。
+  - 待接受邀请可查看、复制和撤销。
+  - 被邀请注册时，邮箱和公司名称默认填充且不可编辑。
+  - 被邀请注册时，后端以邀请 token 对应邮箱和组织上下文为准，不信任前端篡改后的邮箱或公司字段。
+  - 角色权限 Tab 支持查看细粒度权限项，并允许 Owner 编辑 `Admin/Editor/Viewer` 的权限配置。
+  - 后端实际访问控制按具体权限项执行，项目、接口、资产、团队和角色权限相关操作不再只依赖粗粒度角色等级。
+  - 旧项目没有自定义角色权限配置时，按默认权限模板回退，不破坏已有成员协作能力。
+  - 角色权限 Tab 采用角色列表 + 当前角色详情/权限分组编辑交互，不再使用所有角色横向平铺矩阵。
+  - Owner 可新增自定义角色、复制角色、编辑角色名称/描述/权限。
+  - 未被成员或待接受邀请引用的自定义角色可删除；被引用角色删除时后端应拒绝并提示。
+  - 成员管理和邀请管理的角色选项来自项目角色定义，支持自定义角色。
+  - 中文界面中内置角色列表和角色详情默认显示中文名称与中文描述，且不改变成员和邀请引用的 `roleKey`。
+  - Team 页面不再依赖静态成员数组。
+  - Dashboard Team 指标不再固定为 owner-only `1`。
 - 验收后版本维护：
   - 工作空间 Git 提交推送：统一提交并推送计划状态、文档、后端和前端相关改动。
   - `sources` 源码目录改动说明：本节点预计包含 `sources/backend-nest` 与 `sources/frontend` 改动。
-  - 远端分支：默认 `origin/dev` 或用户确认后的独立开发分支。
+  - 远端分支：`origin/codex/mockhub-script-mock-engine`。
   - 下一步推荐动作：进入“代理规则分组”节点。
 - 完成说明：
+- 已完成基础团队成员与项目权限能力：`ProjectMember`、`project_members` schema sync、`ProjectAccessService`、项目/API/资产成员权限校验、Team 基础接口、Dashboard Team 真实计数、Team 页面真实成员列表。
+- 初次验收未通过后，已按用户反馈补充邀请链路与角色管理增强。
+- 已新增 `ProjectInvitation` Prisma 模型和 `project_invitations` schema sync，记录项目、邮箱、角色、token、状态、邀请人、过期时间和接受时间。
+- Team 后端邀请接口已支持任意合法邮箱，不再要求邮箱已注册。
+- 邀请成功会生成 invite token、邀请链接和邀请消息，并返回给前端用于自动复制。
+- 已新增公开邀请详情接口和登录态接受邀请接口。
+- 注册接口已支持可选 invite token，注册成功后自动接受匹配邮箱的项目邀请并加入项目。
+- Team 页面已展示待接受邀请列表，支持复制邀请消息和撤销邀请。
+- Team 页面已新增角色与权限矩阵，展示 Owner/Admin/Editor/Viewer 对项目管理、成员管理、接口维护、公共资产维护和只读访问的权限边界。
+- Team 页面已根据业务场景调整为「成员管理 / 邀请管理 / 角色权限」Tab 分区，避免邀请、成员、权限规则混在单个大页面中。
+- 三次验收反馈后，已完成“被邀请注册邮箱与公司锁定逻辑”：邀请详情返回组织/公司上下文；邀请注册页默认填充并锁定邮箱和公司名称；后端注册带 invite token 时以邀请上下文中的邮箱和组织归属为准，不信任前端提交的邮箱和公司字段。
+- 四次验收反馈后，已完成“角色权限可编辑与权限粒度细化”：新增 `ProjectRolePermission` 模型和 `project_role_permissions` schema sync；后端权限从角色等级升级为 permission key 校验；Team 角色权限 Tab 支持 Owner 编辑 Admin/Editor/Viewer 的项目、接口、公共资产、团队和角色权限细粒度权限项；Owner 固定全权限不可编辑；旧项目无自定义配置时回退默认权限模板。
+- 五次验收反馈后，已完成“角色可编辑与权限维护交互重构”：新增 `ProjectRoleDefinition` 模型和 `project_roles` schema sync；角色从固定枚举升级为项目级可维护资源；默认补齐 Owner/Admin/Editor/Viewer；Owner 固定全权限不可删除；Admin/Editor/Viewer 和自定义角色可编辑名称、描述和权限；成员与邀请角色选项改为读取项目角色定义；Team 角色权限页改为左侧角色列表、右侧当前角色详情与分组权限编辑，不再使用横向平铺矩阵。
+- 六次验收反馈后，已完成“内置角色中文化”：内置角色展示名称和描述改为中文；`roleKey` 保持 Owner/Admin/Editor/Viewer 不变；已初始化项目会在默认角色补齐流程中同步 `system_role = 1` 的内置角色展示信息，自定义角色不受影响。
 - 验证结果：
+- 基础权限实现阶段已验证：`cd sources/backend-nest && npx nest build` 通过。
+- 基础权限实现阶段已验证：`cd sources/frontend && npm run build` 通过。
+- 基础权限实现阶段已验证：`cd sources/backend-nest && npm test -- --runInBand gateway.body.spec.ts script-mock.service.spec.ts project-access.service.spec.ts` 通过，3 个测试套件、14 个测试全部通过。
+- 基础权限实现阶段已验证：`git diff --check` 通过。
+- `cd sources/backend-nest && npx nest build`：通过。
+- `cd sources/frontend && npm run build`：通过。
+- `cd sources/backend-nest && npm test -- --runInBand gateway.body.spec.ts script-mock.service.spec.ts project-access.service.spec.ts team.service.spec.ts`：通过，4 个测试套件、16 个测试全部通过。
+- `git diff --check`：通过。
+- 二次页面分区调整后，`cd sources/frontend && npm run build`：通过。
+- 三次注册锁定补强后，`cd sources/backend-nest && npx nest build`：通过。
+- 三次注册锁定补强后，`cd sources/frontend && npm run build`：通过。
+- 三次注册锁定补强后，`cd sources/backend-nest && npm test -- --runInBand gateway.body.spec.ts script-mock.service.spec.ts project-access.service.spec.ts team.service.spec.ts`：通过，4 个测试套件、17 个测试全部通过。
+- 三次注册锁定补强后，`git diff --check`：通过。
+- 受邀请用户注册失败回归修复后，`cd sources/backend-nest && npx nest build`：通过。
+- 受邀请用户注册失败回归修复后，`cd sources/backend-nest && npm test -- --runInBand auth.service.spec.ts team.service.spec.ts project-access.service.spec.ts gateway.body.spec.ts script-mock.service.spec.ts`：通过，5 个测试套件、18 个测试全部通过。
+- 受邀请用户注册失败回归修复后，`cd sources/frontend && npm run build`：通过。
+- 受邀请用户注册失败回归修复后，`git diff --check`：通过。
+- 角色权限可编辑与权限粒度细化后，`cd sources/backend-nest && npx nest build`：通过。
+- 角色权限可编辑与权限粒度细化后，`cd sources/backend-nest && npm test -- --runInBand auth.service.spec.ts team.service.spec.ts project-access.service.spec.ts gateway.body.spec.ts script-mock.service.spec.ts`：通过，5 个测试套件、21 个测试全部通过。
+- 角色权限可编辑与权限粒度细化后，`cd sources/frontend && npm run build`：通过。
+- 角色权限可编辑与权限粒度细化后，`git diff --check`：通过。
+- 角色可编辑与权限维护交互重构后，`cd sources/backend-nest && npx nest build`：通过。
+- 角色可编辑与权限维护交互重构后，`cd sources/backend-nest && npm test -- --runInBand auth.service.spec.ts team.service.spec.ts project-access.service.spec.ts gateway.body.spec.ts script-mock.service.spec.ts`：通过，5 个测试套件、21 个测试全部通过。
+- 角色可编辑与权限维护交互重构后，`cd sources/frontend && npm run build`：通过。
+- 内置角色中文化后，`cd sources/backend-nest && npx nest build`：通过。
+- 内置角色中文化后，`cd sources/frontend && npm run build`：通过。
+- 内置角色中文化后，`cd sources/backend-nest && npm test -- --runInBand auth.service.spec.ts team.service.spec.ts project-access.service.spec.ts gateway.body.spec.ts script-mock.service.spec.ts`：通过，5 个测试套件、21 个测试全部通过。
+- 内置角色中文化后，`git diff --check`：通过。
 - 遗留事项：
+- 本节点实现邀请链接和前端复制，不接入真实邮件发送服务。
+- 未做真实数据库下的多用户浏览器端邀请注册联调；当前完成判断需基于构建、单测、代码路径与接口实现验证。
+- 当前权限模型未接入操作审计；后续 Analytics 与审计增强节点可继续补充成员变更审计。
 - 用户验收结论：
+- 用户验收结论：验收通过。
 - 用户验收时间：
+- 用户验收时间：2026-06-04。
 
 #### 节点 5
 

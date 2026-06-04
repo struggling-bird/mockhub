@@ -74,6 +74,87 @@ export interface AssetSuggestion {
   confidence: number;
 }
 
+export type ProjectRole = string;
+export type ProjectMemberStatus = 'Active' | 'Inactive';
+export type ProjectPermissionKey =
+  | 'project.view'
+  | 'project.update'
+  | 'project.delete'
+  | 'api.view'
+  | 'api.create'
+  | 'api.update'
+  | 'api.delete'
+  | 'api.proxy'
+  | 'asset.view'
+  | 'asset.create'
+  | 'asset.update'
+  | 'asset.delete'
+  | 'asset.suggestion.accept'
+  | 'asset.suggestion.ignore'
+  | 'team.view'
+  | 'team.invite'
+  | 'team.member.update'
+  | 'team.member.remove'
+  | 'team.invitation.revoke'
+  | 'role.view'
+  | 'role.update';
+
+export interface ProjectMember {
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+  company?: string | null;
+  role: ProjectRole;
+  status: ProjectMemberStatus;
+  isOwner: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ProjectInvitation {
+  id: string;
+  projectId: string;
+  projectName: string;
+  organizationName: string;
+  email: string;
+  role: Exclude<ProjectRole, 'Owner'>;
+  status: 'Pending' | 'Accepted' | 'Revoked' | 'Expired';
+  token: string;
+  inviteLink: string;
+  inviteMessage: string;
+  invitedByEmail: string;
+  invitedByName: string;
+  expiresAt: string;
+  acceptedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectMembersResponse {
+  currentUserRole: ProjectRole;
+  members: ProjectMember[];
+  invitations: ProjectInvitation[];
+}
+
+export interface ProjectRoleDefinition {
+  roleKey: string;
+  name: string;
+  description?: string | null;
+  systemRole: boolean;
+  locked: boolean;
+  sortOrder: number;
+  permissions: ProjectPermissionKey[];
+}
+
+export interface ProjectRolePermissionsResponse {
+  currentUserRole: ProjectRole;
+  roles: ProjectRoleDefinition[];
+  permissions: Record<string, ProjectPermissionKey[]>;
+  permissionKeys: ProjectPermissionKey[];
+  editableRoles: string[];
+}
+
 export interface ProxyGroup {
   id: string;
   name: string;

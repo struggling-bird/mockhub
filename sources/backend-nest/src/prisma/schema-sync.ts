@@ -183,6 +183,89 @@ export async function ensureDatabaseSchema(config: DatabaseConfig) {
     `);
 
     await conn.query(`
+      CREATE TABLE IF NOT EXISTS project_roles (
+        id          VARCHAR(50)  NOT NULL PRIMARY KEY,
+        project_id  VARCHAR(50)  NOT NULL,
+        role_key    VARCHAR(50)  NOT NULL,
+        name        VARCHAR(100) NOT NULL,
+        description VARCHAR(255) NULL,
+        system_role TINYINT(1)   NOT NULL DEFAULT 0,
+        locked      TINYINT(1)   NOT NULL DEFAULT 0,
+        sort_order  INT          NOT NULL DEFAULT 0,
+        created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_project_roles_project_key (project_id, role_key),
+        INDEX idx_project_roles_project_id (project_id),
+        CONSTRAINT fk_project_roles_project
+          FOREIGN KEY (project_id) REFERENCES projects(id)
+          ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS project_role_permissions (
+        id             VARCHAR(50)  NOT NULL PRIMARY KEY,
+        project_id     VARCHAR(50)  NOT NULL,
+        role           VARCHAR(50)  NOT NULL,
+        permission_key VARCHAR(100) NOT NULL,
+        enabled        TINYINT(1)   NOT NULL DEFAULT 1,
+        created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_project_role_permissions (project_id, role, permission_key),
+        INDEX idx_project_role_permissions_project_id (project_id),
+        CONSTRAINT fk_project_role_permissions_project
+          FOREIGN KEY (project_id) REFERENCES projects(id)
+          ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS project_members (
+        id          VARCHAR(50)  NOT NULL PRIMARY KEY,
+        project_id  VARCHAR(50)  NOT NULL,
+        user_id     VARCHAR(50)  NOT NULL,
+        role        VARCHAR(50)  NOT NULL,
+        status      VARCHAR(50)  NOT NULL DEFAULT 'Active',
+        created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_project_members_project_user (project_id, user_id),
+        INDEX idx_project_members_user_id (user_id),
+        INDEX idx_project_members_project_id (project_id),
+        CONSTRAINT fk_project_members_project
+          FOREIGN KEY (project_id) REFERENCES projects(id)
+          ON DELETE CASCADE,
+        CONSTRAINT fk_project_members_user
+          FOREIGN KEY (user_id) REFERENCES users(id)
+          ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS project_invitations (
+        id            VARCHAR(50)  NOT NULL PRIMARY KEY,
+        project_id    VARCHAR(50)  NOT NULL,
+        email         VARCHAR(255) NOT NULL,
+        role          VARCHAR(50)  NOT NULL,
+        token         VARCHAR(128) NOT NULL UNIQUE,
+        status        VARCHAR(50)  NOT NULL DEFAULT 'Pending',
+        invited_by_id VARCHAR(50)  NOT NULL,
+        expires_at    TIMESTAMP    NOT NULL,
+        accepted_at   TIMESTAMP    NULL,
+        created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_project_invitations_project_id (project_id),
+        INDEX idx_project_invitations_email (email),
+        INDEX idx_project_invitations_status (status),
+        CONSTRAINT fk_project_invitations_project
+          FOREIGN KEY (project_id) REFERENCES projects(id)
+          ON DELETE CASCADE,
+        CONSTRAINT fk_project_invitations_invited_by
+          FOREIGN KEY (invited_by_id) REFERENCES users(id)
+          ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await conn.query(`
       CREATE TABLE IF NOT EXISTS public_assets (
         id          VARCHAR(50)  NOT NULL PRIMARY KEY,
         project_id  VARCHAR(50)  NOT NULL,

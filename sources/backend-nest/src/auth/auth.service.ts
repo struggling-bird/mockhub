@@ -10,6 +10,7 @@ import {
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ok } from '../common/api-response';
+import { TeamService } from '../team/team.service';
 
 @Injectable()
 export class AuthService {
@@ -21,6 +22,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly teamService: TeamService,
   ) {}
 
   private getTokenKey(token: string) {
@@ -32,8 +34,13 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto) {
+    const inviteContext = dto.inviteToken
+      ? await this.teamService.registrationContext(dto.inviteToken)
+      : null;
+    const email = inviteContext?.email || dto.email.trim().toLowerCase();
+    const company = inviteContext?.company || dto.company || null;
     const existing = await this.prisma.user.findUnique({
-      where: { email: dto.email },
+      where: { email },
     });
     if (existing) {
       throw new ConflictException('Email already registered');
@@ -41,24 +48,32 @@ export class AuthService {
 
     const passwordHash = hashPassword(dto.password);
     const token = generateToken();
-    const user = await this.prisma.user.create({
-      data: {
-        id: generateId('u'),
-        email: dto.email,
-        password: passwordHash,
-      },
-      select: {
-        id: true,
-        email: true,
-        createdAt: true,
-      },
-    });
+    const userId = generateId('u');
+    await this.prisma.$executeRaw`
+      INSERT INTO users (id, email, password, username, company)
+      VALUES (${userId}, ${email}, ${passwordHash}, ${dto.username || null}, ${company})
+    `;
+    const users = await this.prisma.$queryRaw<
+      { id: string; email: string; createdAt: Date }[]
+    >`
+      SELECT id, email, created_at AS createdAt
+      FROM users
+      WHERE id = ${userId}
+      LIMIT 1
+    `;
+    const user = users[0];
 
+    const acceptedInvitations = await this.teamService.acceptPendingForUser(
+      user.id,
+      user.email,
+      dto.inviteToken,
+    );
     await this.persistToken(token, user.id);
     return ok(
       {
         token,
         user,
+        acceptedInvitations,
       },
       '注册成功',
     );
@@ -121,4 +136,3 @@ export class AuthService {
     return ok({ success: true }, '退出登录成功');
   }
 }
-

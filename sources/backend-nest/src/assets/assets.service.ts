@@ -3,6 +3,8 @@ import { ok } from '../common/api-response';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAssetDto } from './dto/create-asset.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
+import { ProjectAccessService } from '../projects/project-access.service';
+import type { ProjectPermissionKey } from '../projects/project-permissions';
 
 export interface AssetSuggestion {
   id: string;
@@ -17,16 +19,21 @@ export interface AssetSuggestion {
 
 @Injectable()
 export class AssetsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly projectAccess: ProjectAccessService,
+  ) {}
 
-  private async ensureProjectOwned(ownerId: string, projectId: string) {
-    const project = await this.prisma.project.findFirst({
-      where: { id: projectId, ownerId },
-      select: { id: true },
-    });
-    if (!project) {
-      throw new NotFoundException('Project not found');
-    }
+  private async ensureProjectReadable(userId: string, projectId: string) {
+    await this.projectAccess.ensurePermission(userId, projectId, 'asset.view');
+  }
+
+  private async ensureProjectPermission(
+    userId: string,
+    projectId: string,
+    permission: ProjectPermissionKey,
+  ) {
+    await this.projectAccess.ensurePermission(userId, projectId, permission);
   }
 
   private normalize(dto: CreateAssetDto | UpdateAssetDto) {
@@ -63,7 +70,7 @@ export class AssetsService {
   }
 
   async list(ownerId: string, projectId: string) {
-    await this.ensureProjectOwned(ownerId, projectId);
+    await this.ensureProjectReadable(ownerId, projectId);
     const assets = await this.prisma.$queryRaw<any[]>`
       SELECT
         id,
@@ -82,7 +89,11 @@ export class AssetsService {
   }
 
   async create(ownerId: string, projectId: string, dto: CreateAssetDto) {
-    await this.ensureProjectOwned(ownerId, projectId);
+    await this.ensureProjectPermission(ownerId, projectId, 'asset.create');
+    return this.createAsset(projectId, dto);
+  }
+
+  private async createAsset(projectId: string, dto: CreateAssetDto) {
     const data = this.normalize(dto);
     this.validate(data);
     const id = this.createId();
@@ -95,7 +106,7 @@ export class AssetsService {
   }
 
   async suggestions(ownerId: string, projectId: string) {
-    await this.ensureProjectOwned(ownerId, projectId);
+    await this.ensureProjectReadable(ownerId, projectId);
     const existing = await this.prisma.$queryRaw<{ type: string; value: string }[]>`
       SELECT type, value
       FROM public_assets
@@ -386,11 +397,12 @@ export class AssetsService {
   }
 
   async acceptSuggestion(ownerId: string, projectId: string, dto: CreateAssetDto) {
-    return this.create(ownerId, projectId, dto);
+    await this.ensureProjectPermission(ownerId, projectId, 'asset.suggestion.accept');
+    return this.createAsset(projectId, dto);
   }
 
   async update(ownerId: string, projectId: string, assetId: string, dto: UpdateAssetDto) {
-    await this.ensureProjectOwned(ownerId, projectId);
+    await this.ensureProjectPermission(ownerId, projectId, 'asset.update');
     const existing = await this.findAsset(projectId, assetId);
     if (!existing) {
       throw new NotFoundException('Asset not found');
@@ -418,7 +430,7 @@ export class AssetsService {
   }
 
   async remove(ownerId: string, projectId: string, assetId: string) {
-    await this.ensureProjectOwned(ownerId, projectId);
+    await this.ensureProjectPermission(ownerId, projectId, 'asset.delete');
     const existing = await this.findAsset(projectId, assetId);
     if (!existing) {
       throw new NotFoundException('Asset not found');

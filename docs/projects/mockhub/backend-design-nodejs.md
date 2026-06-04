@@ -235,10 +235,13 @@ model ProjectMember {
   id        String   @id @default(cuid())
   projectId String
   userId    String
-  role      String   // Admin / Editor / Viewer ...
+  role      String   // Admin / Editor / Viewer
   status    String   // Active / Inactive
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   project   Project  @relation(fields: [projectId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
 }
 ```
 
@@ -246,6 +249,13 @@ model ProjectMember {
 
 - 映射「Team Management」页面；
 - 决定谁可以创建/编辑 Mock、谁可以仅查看等权限。
+- Owner 由 `Project.ownerId` 表示，不强制写入普通成员表；接口返回时可作为虚拟成员行展示。
+- `ProjectRoleDefinition` 记录项目级角色定义，默认补齐 Owner、Admin、Editor、Viewer，同时支持项目自定义角色。
+- `ProjectRolePermission` 记录项目级角色权限配置，按 `project_id + role + permission_key` 唯一约束；旧项目无配置时使用默认权限模板。
+- `ProjectAccessService` 同时负责项目可见性、角色定义补齐、角色 CRUD、角色识别和 permission key 校验，接口层按 `project.view`、`api.update`、`asset.suggestion.accept`、`team.invite`、`role.update` 等具体权限项执行访问控制。
+- `ProjectInvitation` 记录项目邀请邮箱、角色、token、状态、邀请人、过期时间和接受时间。
+- 成员邀请支持任意合法邮箱；未注册用户可通过邀请链接注册，注册成功后自动接受邀请并加入项目。
+- 注册接口带邀请 token 时，以邀请记录中的邮箱和项目组织上下文写入新用户，避免前端篡改邮箱或公司名称造成跨身份加入。
 
 ---
 

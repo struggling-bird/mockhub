@@ -4,23 +4,29 @@ import { CreateApiDto } from './dto/create-api.dto';
 import { UpdateApiDto } from './dto/update-api.dto';
 import { ApiProxyRequestDto } from './dto/proxy-request.dto';
 import { ok } from '../common/api-response';
+import { ProjectAccessService } from '../projects/project-access.service';
 
 @Injectable()
 export class ApisService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly projectAccess: ProjectAccessService,
+  ) {}
 
-  private async ensureProjectOwned(ownerId: string, projectId: string) {
-    const project = await this.prisma.project.findFirst({
-      where: { id: projectId, ownerId },
-    });
-    if (!project) {
-      throw new NotFoundException('Project not found');
-    }
-    return project;
+  private async ensureProjectReadable(userId: string, projectId: string) {
+    return this.projectAccess.ensurePermission(userId, projectId, 'api.view');
+  }
+
+  private async ensureProjectPermission(
+    userId: string,
+    projectId: string,
+    permission: Parameters<ProjectAccessService['ensurePermission']>[2],
+  ) {
+    return this.projectAccess.ensurePermission(userId, projectId, permission);
   }
 
   async list(ownerId: string, projectId: string) {
-    await this.ensureProjectOwned(ownerId, projectId);
+    await this.ensureProjectReadable(ownerId, projectId);
     const list = await this.prisma.projectApi.findMany({
       where: { projectId },
       orderBy: { updatedAt: 'desc' },
@@ -39,7 +45,7 @@ export class ApisService {
   }
 
   async create(ownerId: string, projectId: string, dto: CreateApiDto) {
-    await this.ensureProjectOwned(ownerId, projectId);
+    await this.ensureProjectPermission(ownerId, projectId, 'api.create');
     const api = await this.prisma.projectApi.create({
       data: {
         projectId,
@@ -95,7 +101,7 @@ export class ApisService {
   }
 
   async getOne(ownerId: string, projectId: string, apiId: string) {
-    await this.ensureProjectOwned(ownerId, projectId);
+    await this.ensureProjectReadable(ownerId, projectId);
     const api = await this.prisma.projectApi.findFirst({
       where: { id: apiId, projectId },
     });
@@ -137,7 +143,7 @@ export class ApisService {
     apiId: string,
     dto: UpdateApiDto,
   ) {
-    await this.ensureProjectOwned(ownerId, projectId);
+    await this.ensureProjectPermission(ownerId, projectId, 'api.update');
     const api = await this.prisma.projectApi.findFirst({
       where: { id: apiId, projectId },
     });
@@ -218,7 +224,7 @@ export class ApisService {
   }
 
   async remove(ownerId: string, projectId: string, apiId: string) {
-    await this.ensureProjectOwned(ownerId, projectId);
+    await this.ensureProjectPermission(ownerId, projectId, 'api.delete');
     const api = await this.prisma.projectApi.findFirst({
       where: { id: apiId, projectId },
     });
@@ -235,7 +241,7 @@ export class ApisService {
     apiId: string,
     dto: ApiProxyRequestDto,
   ) {
-    await this.ensureProjectOwned(ownerId, projectId);
+    await this.ensureProjectPermission(ownerId, projectId, 'api.proxy');
     const api = await this.prisma.projectApi.findFirst({
       where: { id: apiId, projectId },
       select: { id: true },
