@@ -111,7 +111,7 @@
 | 节点 2 | 请求日志与 Dashboard 数据化 | 已验收 | 验收通过 |
 | 节点 3 | 公共资产 CRUD | 已验收 | 验收通过 |
 | 节点 4 | 团队成员与项目权限 | 已验收 | 验收通过 |
-| 节点 5 | 代理规则分组 | 未开始 | 未验收 |
+| 节点 5 | 代理规则分组 | 已验收 | 验收通过 |
 | 节点 6 | 多环境与场景编排 | 未开始 | 未验收 |
 | 节点 7 | Analytics 与审计增强 | 未开始 | 未验收 |
 
@@ -528,35 +528,86 @@
 #### 节点 5
 
 - 节点名称：代理规则分组
-- 当前状态：`未开始`
+- 当前状态：`已验收`
+- 方案确认：
+  - 用户已确认“节点 5 代理规则分组”方案，进入实施计划落地。
+  - 确认时间：2026-06-04。
+  - 用户已确认“节点 5 代理规则分组”实施计划，进入源码实现。
 - 目标：
   - 将 Proxy Rules 从静态展示升级为真实规则分组。
   - 支持正则匹配、模式配置、规则优先级和自动捕获策略。
 - 前置条件：
   - 节点 4 已完成并经用户验收，且完成提交推送门禁。
+  - 当前工作空间仓库分支：`codex/mockhub-script-mock-engine`。
+  - 当前远端跟踪分支：`origin/codex/mockhub-script-mock-engine`。
+  - 当前工作区状态：干净。
+  - 当前任务涉及 `sources/backend-nest` 与 `sources/frontend`，二者均为当前工作空间单 Git 仓库内源码目录。
 - 实施步骤：
-  - 增加 `ProxyGroup` 模型。
-  - 增加代理规则后端模块。
-  - 网关接入规则匹配和模式决策。
-  - 前端 Proxy 页面接入真实接口，支持增删改查。
-  - 同步网关设计与开发规范。
+  - 数据模型与 schema sync：
+    - 新增 `ProxyGroup` 模型与 `proxy_groups` 表。
+    - 字段包含 `id`、`projectId`、`name`、`regex`、`mode`、`targetUrl`、`priority`、`enabled`、`autoCapture`、`createdAt`、`updatedAt`。
+    - `mode` 支持 `Mock`、`Proxy`、`Hybrid`，网关内部映射到当前已有 `static`、`proxy` 或项目默认策略。
+  - 代理分组后端模块：
+    - 新增 `ProxyGroupsModule`、controller、service、DTO。
+    - 提供 `GET /api/projects/:projectId/proxy-groups` 查询代理分组。
+    - 提供 `POST /api/projects/:projectId/proxy-groups` 创建代理分组。
+    - 提供 `PUT /api/projects/:projectId/proxy-groups/:groupId` 更新名称、正则、模式、目标地址、优先级、启停和自动捕获。
+    - 提供 `DELETE /api/projects/:projectId/proxy-groups/:groupId` 删除代理分组。
+    - 接入节点 4 项目权限体系：查看使用 `api.view`，新增/编辑/删除使用 `api.update`，网关代理决策相关使用当前项目可见性与代理权限边界。
+  - 网关规则匹配：
+    - 网关请求解析项目后，按 `projectId` 加载启用的代理分组。
+    - 按 `priority` 升序匹配，第一个正则命中 `pathname` 的分组生效。
+    - 命中 `Proxy` 模式时优先使用分组 `targetUrl` 转发。
+    - 命中 `Mock` 模式时优先走接口 Mock 策略，不使用分组目标地址。
+    - 命中 `Hybrid` 模式时，接口存在走接口 Mock/Proxy 配置，接口不存在走分组或项目级 Proxy 自动学习。
+    - 未命中任何分组时，保留当前项目级 `defaultMockMode`、`proxyUrl`、`autoCapture` 行为，避免破坏既有网关逻辑。
+    - 自动捕获创建接口时，记录命中分组的 target 或项目级 proxy 作为接口代理目标。
+  - 前端 Proxy 页面：
+    - 移除 `MOCK_PROXY_GROUPS` 作为业务数据源。
+    - 调用真实代理分组接口，支持 loading、empty、error。
+    - 页面采用紧凑列表/表格风格，不再使用大卡片墙。
+    - 支持新增、编辑、删除、启停、优先级、模式、正则、目标地址、自动捕获配置。
+    - 复制/重启全局代理区保留为项目级入口展示，复制地址使用当前浏览器 origin 下 `/gateway` 或项目代理入口。
+    - 补充中英文国际化文案。
+  - 文档同步：
+    - 更新 `docs/product-knowledge/mockhub.md`、`docs/projects/mockhub/backend-design-nodejs.md`、`docs/projects/mockhub/frontend-product-design.md`、`docs/projects/mockhub/source-map.md`。
 - 验证方式：
-  - 后端构建、前端构建。
-  - 配置不同规则后，通过网关请求验证匹配与模式选择。
+  - `cd sources/backend-nest && npx nest build`
+  - `cd sources/frontend && npm run build`
+  - `cd sources/backend-nest && npm test -- --runInBand gateway.body.spec.ts script-mock.service.spec.ts`
+  - 如新增代理分组或网关规则单测，则补充执行对应测试文件。
+  - `git diff --check`
+  - 通过单测或代码路径验证规则优先级、正则命中、Proxy 模式 targetUrl 优先、未命中回退项目级策略。
 - 验收标准：
   - 代理分组真实持久化。
   - 网关能按规则影响 Mock / Proxy 策略。
   - 页面不再依赖 `MOCK_PROXY_GROUPS` 作为业务数据源。
+  - Proxy 页面支持代理分组新增、编辑、删除、启停、优先级和自动捕获配置。
+  - 规则未命中时，既有项目级代理和自动捕获行为不被破坏。
 - 验收后版本维护：
   - 工作空间 Git 提交推送：统一提交并推送计划状态、文档、后端和前端相关改动。
   - `sources` 源码目录改动说明：本节点预计包含 `sources/backend-nest` 与 `sources/frontend` 改动。
-  - 远端分支：默认 `origin/dev` 或用户确认后的独立开发分支。
+  - 远端分支：`origin/codex/mockhub-script-mock-engine`。
   - 下一步推荐动作：进入“多环境与场景编排”节点。
 - 完成说明：
+  - 已新增 `ProxyGroup` Prisma 模型和 `proxy_groups` schema sync，字段覆盖名称、正则、模式、目标地址、优先级、启停和自动捕获。
+  - 已新增 `ProxyGroupsModule`、controller、service、DTO 和服务单测，提供项目级代理分组查询、创建、更新、删除接口，并接入 `api.view` / `api.update` 权限。
+  - 已将 Gateway 接入代理分组匹配，按项目启用分组的 `priority` 与 `regex` 决定命中规则；`Proxy` 模式优先使用分组 `targetUrl`，`Hybrid` 支持未命中接口时代理学习，`Mock` 模式在接口不存在时返回明确未命中响应，不隐式代理到上游。
+  - 已将 Dashboard 活跃代理统计扩展为项目级代理配置与启用代理分组之和。
+  - 已将前端 Proxy 页面从静态数据改为真实 CRUD 页面，支持紧凑列表、表单编辑、启停、删除、优先级、模式、目标地址、自动捕获和网关地址复制。
+  - 已同步产品知识、后端设计、前端产品设计和源码说明文档。
 - 验证结果：
+  - `cd sources/backend-nest && npx nest build`：通过。
+  - `cd sources/frontend && npm run build`：通过。
+  - `cd sources/backend-nest && npm test -- --runInBand gateway.body.spec.ts script-mock.service.spec.ts proxy-groups.service.spec.ts project-access.service.spec.ts`：4 个测试套件通过，18 个用例通过。
+  - `git diff --check`：通过。
 - 遗留事项：
+  - 未启动真实前后端服务做浏览器端端到端联调；当前验收依据为构建、单测、代码路径和文档同步验证。
+  - 节点 6 可继续扩展多环境与场景编排，让代理分组与环境维度联动。
 - 用户验收结论：
+  - 用户回复“验收通过，继续”，确认节点 5 代理规则分组通过验收。
 - 用户验收时间：
+  - 2026-06-04。
 
 #### 节点 6
 

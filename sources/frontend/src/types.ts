@@ -157,11 +157,16 @@ export interface ProjectRolePermissionsResponse {
 
 export interface ProxyGroup {
   id: string;
+  projectId: string;
   name: string;
   regex: string;
-  autoSave: boolean;
-  mode: 'Mock' | 'Proxy' | 'Auto';
-  rulesCount: number;
+  mode: 'Mock' | 'Proxy' | 'Hybrid';
+  targetUrl?: string | null;
+  priority: number;
+  enabled: boolean;
+  autoCapture: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export const MOCK_APIS: ApiItem[] = [
@@ -172,7 +177,7 @@ export const MOCK_APIS: ApiItem[] = [
 ];
 
 export const MOCK_PROXY_GROUPS: ProxyGroup[] = [
-  { id: 'g1', name: 'User Service', regex: '^/usr/.*', autoSave: true, mode: 'Auto', rulesCount: 12 },
-  { id: 'g2', name: 'App Core', regex: '^/app/.*', autoSave: false, mode: 'Proxy', rulesCount: 5 },
-  { id: 'g3', name: 'Legacy API', regex: '^/old/.*', autoSave: true, mode: 'Mock', rulesCount: 8 },
+  { id: 'g1', projectId: 'p1', name: 'User Service', regex: '^/usr/.*', enabled: true, autoCapture: true, mode: 'Hybrid', targetUrl: null, priority: 10 },
+  { id: 'g2', projectId: 'p1', name: 'App Core', regex: '^/app/.*', enabled: true, autoCapture: false, mode: 'Proxy', targetUrl: null, priority: 20 },
+  { id: 'g3', projectId: 'p1', name: 'Legacy API', regex: '^/old/.*', enabled: true, autoCapture: true, mode: 'Mock', targetUrl: null, priority: 30 },
 ];

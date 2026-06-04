@@ -199,12 +199,18 @@ API 管理模块是 MockHub 的核心，用于按项目维度管理接口定义�
 
 Proxy 规则模块用于按分组管理正则路由规则和代理 / Mock 运行模式。
 
-- **代理分组卡片**
-  - 分组名称、匹配正则、模式（Mock / Proxy / Hybrid）、是否自动保存、规则数量等信息。
-  - 模式标签以颜色区分不同模式。
+- **代理分组列表**
+  - 数据来自项目级接口 `/api/projects/:projectId/proxy-groups`，不再依赖前端静态 Mock 数据。
+  - 以紧凑列表展示分组名称、匹配正则、模式（Mock / Proxy / Hybrid）、目标地址、优先级、启停状态和自动捕获状态，避免大卡片风格影响高频维护效率。
+- **分组编辑表单**
+  - 支持新增、编辑、删除、启停、优先级调整、模式切换、目标地址维护和自动捕获开关。
+  - 正则和优先级决定网关命中顺序；数字越小优先级越高。
+  - `Mock` 模式优先使用已存在接口的 Mock 配置，接口不存在时不隐式代理学习。
+  - `Proxy` 模式优先使用分组目标地址转发。
+  - `Hybrid` 模式在接口存在时尊重接口 Mock/Proxy 配置，接口不存在时走分组或项目级代理自动学习。
 - **全局代理配置**
-  - 展示项目层面的全局代理地址（如 `https://proxy.mockdev.io/p-8821`）。
-  - 提供复制 URL、重启代理服务等操作按钮。
+  - 展示当前浏览器 origin 下的统一网关入口 `/gateway`。
+  - 提供复制 URL 操作，便于外部服务通过 `x-mock-key` 接入项目网关。
 
 ### 4.6 公共资产（Public Assets）
 
@@ -320,7 +326,7 @@ Proxy 规则模块用于按分组管理正则路由规则和代理 / Mock 运行
   - 对应 `api_endpoints`、`mock_configs`、`logs_requests` 等表。
   - Three modes（static/script/proxy）与后端 `mode` 字段一致。
 - **Proxy Rules / ProxyConfig**
-  - 对应 `proxy_groups` 表及其模式字段（Mock / Proxy / Hybrid）。
+  - 对应 `proxy_groups` 表及其模式字段（Mock / Proxy / Hybrid）、正则、优先级、目标地址、启停和自动捕获配置。
 - **Public Assets**
   - 对应 `public_assets` 或类似共享配置表。
 - **Team Management**

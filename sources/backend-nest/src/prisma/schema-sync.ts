@@ -183,6 +183,27 @@ export async function ensureDatabaseSchema(config: DatabaseConfig) {
     `);
 
     await conn.query(`
+      CREATE TABLE IF NOT EXISTS proxy_groups (
+        id           VARCHAR(50)  NOT NULL PRIMARY KEY,
+        project_id   VARCHAR(50)  NOT NULL,
+        name         VARCHAR(255) NOT NULL,
+        regex        VARCHAR(512) NOT NULL,
+        mode         VARCHAR(50)  NOT NULL,
+        target_url   VARCHAR(512) NULL,
+        priority     INT          NOT NULL DEFAULT 100,
+        enabled      TINYINT(1)   NOT NULL DEFAULT 1,
+        auto_capture TINYINT(1)   NOT NULL DEFAULT 0,
+        created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_proxy_groups_project_id (project_id),
+        INDEX idx_proxy_groups_project_enabled_priority (project_id, enabled, priority),
+        CONSTRAINT fk_proxy_groups_project
+          FOREIGN KEY (project_id) REFERENCES projects(id)
+          ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await conn.query(`
       CREATE TABLE IF NOT EXISTS project_roles (
         id          VARCHAR(50)  NOT NULL PRIMARY KEY,
         project_id  VARCHAR(50)  NOT NULL,

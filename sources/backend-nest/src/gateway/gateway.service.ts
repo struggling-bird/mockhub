@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
 import { PrismaService } from '../prisma/prisma.service';
+import { ProxyGroupsService, type ProxyGroupRecord } from '../proxy-groups/proxy-groups.service';
 import { RequestLogsService } from '../request-logs/request-logs.service';
 import { ScriptMockService } from './script-mock.service';
 import { describeGatewayBody, getGatewayBodyBuffer } from './gateway.body';
@@ -33,6 +34,7 @@ export class GatewayService {
     private readonly prisma: PrismaService,
     private readonly scriptMockService: ScriptMockService,
     private readonly requestLogsService: RequestLogsService,
+    private readonly proxyGroupsService: ProxyGroupsService,
   ) {}
 
   private getMockKey(req: FastifyRequest): string | null {
@@ -143,14 +145,32 @@ export class GatewayService {
     }
   }
 
-  private decideMode(project: any, api: any | null): MockMode {
+  private decideMode(project: any, api: any | null, proxyGroup?: ProxyGroupRecord | null): MockMode {
+    if (proxyGroup?.mode === 'Proxy') return 'proxy';
+    if (proxyGroup?.mode === 'Mock') {
+      const mode = (api?.mockMode as MockMode | undefined) ?? (project.defaultMockMode as MockMode | undefined) ?? 'static';
+      return mode === 'proxy' ? 'static' : mode;
+    }
     const mode = (api?.mockMode as MockMode | undefined) ?? (project.defaultMockMode as MockMode | undefined) ?? 'static';
     if (mode === 'script' || mode === 'proxy' || mode === 'static') return mode;
     return 'static';
   }
 
-  private resolveTargetBase(project: any, api: any | null): string | null {
+  private resolveTargetBase(project: any, api: any | null, proxyGroup?: ProxyGroupRecord | null): string | null {
+    if (proxyGroup?.targetUrl) return proxyGroup.targetUrl;
     return (api?.mockProxyUrl as string | null) || (project.proxyUrl as string | null) || null;
+  }
+
+  private async matchProxyGroup(projectId: string, pathname: string) {
+    const groups = await this.proxyGroupsService.findByProject(projectId, true);
+    for (const group of groups) {
+      try {
+        if (new RegExp(group.regex).test(pathname)) return group;
+      } catch {
+        // 保存时已校验，运行时若遇到异常规则则跳过，避免中断网关。
+      }
+    }
+    return null;
   }
 
   private buildForwardHeaders(req: FastifyRequest) {
@@ -304,17 +324,48 @@ export class GatewayService {
     const pathname = parsedUrl.pathname || '/';
     const method = (req.method || 'GET').toUpperCase();
 
+    const proxyGroup = await this.matchProxyGroup(project.id, pathname);
     const api = await this.findApi(project.id, method, pathname);
-    const mode = this.decideMode(project, api);
+    const mode = this.decideMode(project, api, proxyGroup);
     this.logger.log(
       `[GatewayService] project=${project.id} method=${method} path=${pathname} query=${parsedUrl.search || '-'} api=${
         api?.id || 'not-found'
-      } mode=${mode}`,
+      } mode=${mode} proxyGroup=${proxyGroup?.id || 'not-matched'}`,
     );
 
     // 接口不存在：自动代理学习并创建
     if (!api) {
-      const targetBase = this.resolveTargetBase(project, null);
+      if (proxyGroup?.mode === 'Mock') {
+        this.logger.warn(
+          `[GatewayService] mock proxy group=${proxyGroup.id} matched but api not found for ${method} ${pathname}`,
+        );
+        this.writeRequestLog({
+          projectId: project.id,
+          method,
+          path: pathname,
+          mode: 'static',
+          statusCode: 404,
+          durationMs: Date.now() - startedAt,
+          errorMessage: 'API not found in Mock proxy group',
+        });
+        return {
+          kind: 'static' as const,
+          static: {
+            status: 404,
+            headers: { 'content-type': 'application/json; charset=utf-8' },
+            body: Buffer.from(
+              JSON.stringify({
+                message: 'API not found in Mock proxy group',
+                path: pathname,
+                method,
+              }),
+              'utf8',
+            ),
+          },
+        };
+      }
+
+      const targetBase = this.resolveTargetBase(project, null, proxyGroup);
       if (!targetBase) {
         this.logger.warn(
           `[GatewayService] project=${project.id} has no proxyUrl for unmatched ${method} ${pathname}`,
@@ -372,7 +423,9 @@ export class GatewayService {
       }
 
       const nextMode: MockMode =
-        (project.defaultMockMode as MockMode) || 'static';
+        proxyGroup?.mode === 'Proxy'
+          ? 'proxy'
+          : (project.defaultMockMode as MockMode) || 'static';
 
       await this.autoCreateApiFromTraffic({
         projectId: project.id,
@@ -384,7 +437,7 @@ export class GatewayService {
         responseSchema,
         mockStaticBody: responseBodyPretty,
         mockMode: nextMode,
-        mockProxyUrl: project.proxyUrl ?? null,
+        mockProxyUrl: targetBase,
       });
 
       this.writeRequestLog({
@@ -469,7 +522,7 @@ export class GatewayService {
     }
 
     // proxy
-    const targetBase = this.resolveTargetBase(project, api);
+    const targetBase = this.resolveTargetBase(project, api, proxyGroup);
     if (!targetBase) {
       this.logger.warn(
         `[GatewayService] project=${project.id} api=${api.id} has no proxy target for ${method} ${pathname}`,
@@ -511,7 +564,7 @@ export class GatewayService {
     });
 
     // 已存在接口：可选自动学习更新（项目级开关）
-    if ((project.autoCapture as any) === true) {
+    if ((proxyGroup?.autoCapture || (project.autoCapture as any) === true)) {
       try {
         const requestHeaderRows = this.toHeaderRows(req.headers as any);
         const requestParams = [

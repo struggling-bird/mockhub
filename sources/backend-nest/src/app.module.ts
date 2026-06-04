@@ -13,6 +13,7 @@ import { GatewayModule } from './gateway/gateway.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { AssetsModule } from './assets/assets.module';
 import { TeamModule } from './team/team.module';
+import { ProxyGroupsModule } from './proxy-groups/proxy-groups.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { TeamModule } from './team/team.module';
     DashboardModule,
     AssetsModule,
     TeamModule,
+    ProxyGroupsModule,
   ],
   controllers: [AppController],
   providers: [

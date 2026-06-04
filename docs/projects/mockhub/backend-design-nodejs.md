@@ -195,8 +195,10 @@ model ProxyGroup {
   name        String
   regex       String
   mode        String   // Mock | Proxy | Hybrid
-  autoSave    Boolean  @default(false)
-  rulesCount  Int      @default(0)
+  targetUrl   String?
+  priority    Int      @default(100)
+  enabled     Boolean  @default(true)
+  autoCapture Boolean  @default(false)
 
   project     Project  @relation(fields: [projectId], references: [id])
 }
@@ -204,9 +206,11 @@ model ProxyGroup {
 
 职责：
 
-- 映射前端 ProxyConfig 卡片列表；
-- `regex` 用于网关请求匹配；
-- `mode` 决定请求走 MockConfig 还是直接代理。
+- 映射前端代理分组列表与编辑表单；
+- `regex` 用于网关请求路径匹配，`priority` 决定多规则命中时的优先级；
+- `mode` 决定请求走 Mock、Proxy 或 Hybrid 策略；
+- `targetUrl` 为分组命中时优先使用的上游代理目标；
+- `autoCapture` 控制命中分组后是否自动学习请求/响应并更新接口定义。
 
 ### 4.5 PublicAsset（公共资产）
 

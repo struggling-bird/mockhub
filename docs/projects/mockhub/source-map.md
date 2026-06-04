@@ -13,18 +13,19 @@
 | --- | --- |
 | `src/main.ts` | NestJS + Fastify 启动入口，设置 `/api` 全局前缀、Swagger、CORS、multipart 和 gateway body parser；`gateway{/*path}` 使用新版具名通配符排除 `/gateway/*` 的 `/api` 前缀 |
 | `src/gateway/gateway.controller.ts` | 网关控制器，使用 Fastify 可接受的 `@All('*')` 注册 `/gateway/*` 业务入口 |
-| `src/app.module.ts` | 聚合 Prisma、Redis、Auth、Projects、Upload、Apis、Gateway、Dashboard、Assets、Team 模块 |
+| `src/app.module.ts` | 聚合 Prisma、Redis、Auth、Projects、Upload、Apis、Gateway、Dashboard、Assets、Team、ProxyGroups 模块 |
 | `src/auth/` | 注册、登录、JWT guard、公开路由装饰器和认证工具；邀请注册时以邀请上下文锁定邮箱和公司 |
 | `src/projects/` | 项目 CRUD、Mock Key、项目级代理配置、项目响应 DTO 和项目访问权限服务 |
 | `src/apis/` | 项目接口 CRUD、接口 Mock 配置、代理请求 DTO，按项目 permission key 控制查看、新增、编辑、删除和代理调试 |
 | `src/assets/` | 项目公共资产 CRUD 与建议资产接口，按项目 permission key 隔离查看、新增、编辑、删除和建议入库 |
+| `src/proxy-groups/` | 项目代理分组 CRUD，按 `api.view` / `api.update` 权限隔离，供 Proxy 页面维护并供 Gateway 按正则、优先级和模式匹配 |
 | `src/team/` | 项目成员、邀请和角色管理接口，支持合法邮箱邀请、邀请详情、邀请注册上下文、接受邀请、撤销邀请、调整角色/状态、移除成员、角色 CRUD 和分组权限保存 |
 | `src/dashboard/` | Dashboard 统计接口，聚合项目接口数、代理配置数、真实团队成员数、最近一小时请求量和最近网关活动 |
-| `src/gateway/` | `/gateway/*` 统一入口，处理 Static Mock、Script Mock、Proxy、自动捕获和请求透传 |
+| `src/gateway/` | `/gateway/*` 统一入口，处理 Static Mock、Script Mock、Proxy、代理分组匹配、自动捕获和请求透传 |
 | `src/gateway/script-mock.service.ts` | 基于 Node `vm` 的轻量脚本 Mock 执行服务，提供受限上下文、响应辅助方法和同步超时保护 |
 | `src/upload/` | Logo 上传、访问和清理 |
 | `src/prisma/` | Prisma service、MariaDB adapter 配置和启动时 schema sync |
-| `prisma/schema.prisma` | User、Project、ProjectMember、ProjectRoleDefinition、ProjectRolePermission、ProjectInvitation、ProjectApi、RequestLog、PublicAsset 数据模型 |
+| `prisma/schema.prisma` | User、Project、ProjectMember、ProjectRoleDefinition、ProjectRolePermission、ProjectInvitation、ProjectApi、ProxyGroup、RequestLog、PublicAsset 数据模型 |
 
 ## 前端结构
 
@@ -38,7 +39,7 @@
 | `src/pages/dashboard/` | Dashboard 总览页面，接入 `/api/dashboard/summary` 展示真实统计和最近网关活动 |
 | `src/pages/project/` | 项目列表、新建、编辑、Logo 上传和项目表单组件 |
 | `src/pages/api-table/` | API 管理、接口表单、响应/Mock 编辑相关组件；Proxy 地址候选和 Mock 编辑区可复用公共资产 |
-| `src/pages/proxy/` | 代理规则页面 |
+| `src/pages/proxy/` | 代理规则页面，接入项目级代理分组 CRUD，支持紧凑列表、表单编辑、启停、删除、优先级、模式、目标地址和自动捕获配置 |
 | `src/pages/assets/` | 公共资产页面，接入项目级资产 CRUD、建议资产详情查看、确认入库、忽略、搜索、复制、空态、错误状态和类型化新增/编辑交互 |
 | `src/pages/team/` | 团队成员页面，按成员管理、邀请管理、角色权限分区，接入项目成员、邀请与角色接口，支持搜索、邀请成员、自动复制邀请、待接受邀请、角色列表与单角色分组权限编辑、角色/状态调整和移除 |
 | `src/pages/integration/` | 集成说明页面 |

@@ -47,10 +47,11 @@ export class DashboardService {
     }
 
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    const [totalApis, requestsPerHour, recentActivity, teamMembers] = await Promise.all([
+    const [totalApis, activeProxyGroups, requestsPerHour, recentActivity, teamMembers] = await Promise.all([
       this.prisma.projectApi.count({
         where: { projectId: { in: projectIds } },
       }),
+      this.countActiveProxyGroups(projectIds),
       this.requestLogsService.countSince(projectIds, oneHourAgo),
       this.requestLogsService.recent(projectIds, 5),
       this.countTeamMembers(projectIds),
@@ -60,7 +61,7 @@ export class DashboardService {
       {
         stats: {
           totalApis,
-          activeProxies: projects.filter((project) => Boolean(project.proxyUrl)).length,
+          activeProxies: projects.filter((project) => Boolean(project.proxyUrl)).length + activeProxyGroups,
           teamMembers,
           requestsPerHour,
         },
@@ -97,6 +98,17 @@ export class DashboardService {
         WHERE project_id IN (${Prisma.join(projectIds)})
           AND status = 'Active'
       ) t
+    `;
+    return Number(rows[0]?.count ?? 0);
+  }
+
+  private async countActiveProxyGroups(projectIds: string[]) {
+    if (projectIds.length === 0) return 0;
+    const rows = await this.prisma.$queryRaw<{ count: bigint | number }[]>`
+      SELECT COUNT(*) AS count
+      FROM proxy_groups
+      WHERE project_id IN (${Prisma.join(projectIds)})
+        AND enabled = 1
     `;
     return Number(rows[0]?.count ?? 0);
   }
